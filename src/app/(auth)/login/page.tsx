@@ -1,43 +1,71 @@
 'use client';
 
+import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
+import { useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { AuthCard } from '@/components/auth/auth-card';
+import { GoogleLoginButton } from '@/components/auth/google-login-button';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/input';
 import { useAuth } from '@/features/auth/auth-provider';
 import { dashboardPathForRole } from '@/features/auth/role-routing';
 
-const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
+const schema = z.object({ email: z.string().email(), password: z.string().min(8, 'Password must be at least 8 characters') });
 type LoginForm = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
+  const { login, loginWithGoogle, isLoading } = useAuth();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginForm>({ resolver: zodResolver(schema) });
 
-  async function onSubmit(values: LoginForm) {
-    const user = await login(values.email, values.password);
+  async function redirectAfterAuth(user: Awaited<ReturnType<typeof login>>) {
+    if (!user.is_email_verified) {
+      router.replace('/verify-email');
+      return;
+    }
     router.replace(dashboardPathForRole(user.role));
   }
 
+  async function onSubmit(values: LoginForm) {
+    const user = await login(values.email, values.password);
+    await redirectAfterAuth(user);
+  }
+
+  const handleGoogleToken = useCallback(async (accessToken: string) => {
+    const user = await loginWithGoogle(accessToken);
+    await redirectAfterAuth(user);
+  }, [loginWithGoogle]);
+
   return (
-    <main className="grid min-h-screen place-items-center bg-gradient-to-br from-[#e8f5f1] to-[#fff2df] p-4">
-      <Card className="w-full max-w-md">
-        <p className="text-3xl font-black text-[#127D61]">FinCore</p>
-        <h1 className="mt-4 text-2xl font-bold">Sign in</h1>
-        <p className="mb-6 text-sm text-slate-500">Use your staff or client account.</p>
+    <AuthCard title="Welcome back" subtitle="Sign in to continue to your FinCore workspace.">
+      <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+        <Field label="Email address" error={errors.email?.message}>
+          <Input autoComplete="email" type="email" placeholder="you@example.com" {...register('email')} />
+        </Field>
+        <Field label="Password" error={errors.password?.message}>
+          <Input autoComplete="current-password" type="password" placeholder="••••••••" {...register('password')} />
+        </Field>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">Secure staff and client access</span>
+          <Link className="font-bold text-[#127D61]" href="/forgot-password">Forgot password?</Link>
+        </div>
+        <Button disabled={isSubmitting || isLoading} className="w-full py-3">
+          {isSubmitting ? 'Signing in...' : 'Sign in'}
+        </Button>
+      </form>
 
-        <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
-          <Field label="Email" error={errors.email?.message}><Input autoComplete="email" type="email" {...register('email')} /></Field>
-          <Field label="Password" error={errors.password?.message}><Input autoComplete="current-password" type="password" {...register('password')} /></Field>
-          <Button disabled={isSubmitting || isLoading}>{isSubmitting ? 'Signing in...' : 'Login'}</Button>
-        </form>
+      <div className="my-5 flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-slate-400">
+        <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />
+      </div>
 
-        <a className="mt-4 block text-center text-sm font-semibold text-[#127D61]" href="/forgot-password">Forgot password?</a>
-      </Card>
-    </main>
+      <GoogleLoginButton onToken={handleGoogleToken} disabled={isSubmitting || isLoading} />
+
+      <p className="mt-6 text-center text-sm text-slate-600">
+        New to FinCore? <Link className="font-bold text-[#127D61]" href="/register">Create an account</Link>
+      </p>
+    </AuthCard>
   );
 }

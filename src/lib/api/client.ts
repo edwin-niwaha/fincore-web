@@ -1,7 +1,7 @@
 import { env } from '@/lib/env';
 import { tokenStore } from '@/lib/auth/tokens';
 import { endpoints } from '@/lib/api/endpoints';
-import type { ApiProblem, LoginResponse } from '@/types/api';
+import type { ApiProblem, TokenRefreshResponse } from '@/types/api';
 
 type RequestOptions = RequestInit & {
   skipAuth?: boolean;
@@ -67,7 +67,7 @@ async function refreshAccessToken(): Promise<string | null> {
     .then(async (res) => {
       if (!res.ok) return null;
 
-      const data = (await res.json()) as Pick<LoginResponse, 'access'>;
+      const data = (await res.json()) as TokenRefreshResponse;
 
       if (!data.access) return null;
 

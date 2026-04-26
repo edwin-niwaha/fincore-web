@@ -21,11 +21,14 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
     if (!user) return router.replace('/login');
+    if (!user.is_email_verified) return router.replace('/verify-email');
+
     const section = sectionForPath(pathname);
     if (section && !canAccessDashboard(user.role, section)) router.replace(dashboardPathForRole(user.role));
   }, [isLoading, pathname, router, user]);
 
   if (isLoading) return <StateView title="Loading your workspace..." />;
   if (!user) return <StateView title="Redirecting to login..." />;
+  if (!user.is_email_verified) return <StateView title="Redirecting to email verification..." />;
   return <>{children}</>;
 }

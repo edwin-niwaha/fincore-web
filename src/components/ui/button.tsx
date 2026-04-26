@@ -5,7 +5,7 @@ export function Button({ className, ...props }: ButtonHTMLAttributes<HTMLButtonE
   return (
     <button
       className={cn(
-        'rounded-xl bg-[#127D61] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f6c54] disabled:cursor-not-allowed disabled:opacity-60',
+        'inline-flex items-center justify-center rounded-xl bg-[#127D61] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f6c54] disabled:cursor-not-allowed disabled:opacity-60',
         className,
       )}
       {...props}

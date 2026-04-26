@@ -21,15 +21,28 @@ export type User = {
   email: string;
   first_name?: string;
   last_name?: string;
+  phone?: string;
+  avatar_url?: string | null;
   role: Role;
   institution?: UUID | null;
   branch?: UUID | null;
+  is_active?: boolean;
+  is_email_verified?: boolean;
+  created_at?: string;
+};
+
+export type TokenPair = {
+  access: string;
+  refresh: string;
 };
 
 export type LoginResponse = {
+  user: User;
+  tokens: TokenPair;
+};
+
+export type TokenRefreshResponse = {
   access: string;
-  refresh: string;
-  user?: User;
 };
 
 export type Client = {
