@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+:root {
+  --fincore-primary: #127D61;
+  --fincore-accent: #F79420;
+}
+
+body {
+  background: #f8fafc;
+  color: #0f172a;
+}
