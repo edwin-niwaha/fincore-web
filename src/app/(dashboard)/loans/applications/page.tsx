@@ -12,10 +12,20 @@ export default function LoanApplicationsPage() {
       description="Loan applications from fincore-api."
       loader={resourcesApi.loanApplications.list}
       columns={[
-        { header: 'Client', accessor: (row) => row.client_name ?? clientName(row.client) },
-        { header: 'Amount', accessor: (row) => money(row.requested_amount ?? row.amount ?? row.principal_balance) },
+        {
+          header: 'Client',
+          accessor: (row) => row.client_name ?? clientName(row.client),
+        },
+        {
+          header: 'Amount',
+          accessor: (row) =>
+            money(row.requested_amount ?? row.amount ?? row.principal_balance),
+        },
         { header: 'Status', accessor: (row) => row.status },
-        { header: 'Submitted', accessor: (row) => row.submitted_at ?? row.created_at ?? '-' },
+        {
+          header: 'Submitted',
+          accessor: (row) => row.submitted_at ?? row.created_at ?? '-',
+        },
       ]}
     />
   );

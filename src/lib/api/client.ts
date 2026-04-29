@@ -46,10 +46,23 @@ function getErrorMessage(details: unknown, status: number): string {
 
 async function parseError(res: Response): Promise<ApiProblem> {
   const details = await readResponseBody(res);
+  const record =
+    details && typeof details === 'object'
+      ? (details as Record<string, unknown>)
+      : null;
 
   return {
     message: getErrorMessage(details, res.status),
     status: res.status,
+    code: typeof record?.code === 'string' ? record.code : undefined,
+    errors:
+      record?.errors && typeof record.errors === 'object'
+        ? (record.errors as Record<string, unknown>)
+        : undefined,
+    path:
+      typeof record?.path === 'string' || record?.path === null
+        ? (record.path as string | null)
+        : undefined,
     details,
   };
 }
@@ -71,7 +84,11 @@ async function refreshAccessToken(): Promise<string | null> {
 
       if (!data.access) return null;
 
-      tokenStore.setAccess(data.access);
+      if (data.refresh) {
+        tokenStore.set(data.access, data.refresh);
+      } else {
+        tokenStore.setAccess(data.access);
+      }
       return data.access;
     })
     .catch(() => null)
@@ -99,7 +116,7 @@ function createHeaders(options: RequestOptions): Headers {
 
 export async function apiRequest<T>(
   path: string,
-  options: RequestOptions = {}
+  options: RequestOptions = {},
 ): Promise<T> {
   const headers = createHeaders(options);
 
@@ -109,7 +126,11 @@ export async function apiRequest<T>(
     cache: 'no-store',
   });
 
-  if (res.status === 401 && options.retryOnUnauthorized !== false && !options.skipAuth) {
+  if (
+    res.status === 401 &&
+    options.retryOnUnauthorized !== false &&
+    !options.skipAuth
+  ) {
     const newAccess = await refreshAccessToken();
 
     if (newAccess) {

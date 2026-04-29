@@ -34,7 +34,9 @@ export function GoogleLoginButton({
 }) {
   const [isReady, setIsReady] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const tokenClientRef = useRef<{ requestAccessToken: () => void } | null>(null);
+  const tokenClientRef = useRef<{ requestAccessToken: () => void } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!env.googleClientId) return;

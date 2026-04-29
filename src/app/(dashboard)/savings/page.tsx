@@ -12,8 +12,14 @@ export default function SavingsPage() {
       description="Savings account balances from fincore-api."
       loader={resourcesApi.savingsAccounts.list}
       columns={[
-        { header: 'Account', accessor: (row) => row.account_number ?? row.account_no ?? row.id },
-        { header: 'Client', accessor: (row) => row.client_name ?? clientName(row.client) },
+        {
+          header: 'Account',
+          accessor: (row) => row.account_number ?? row.account_no ?? row.id,
+        },
+        {
+          header: 'Client',
+          accessor: (row) => row.client_name ?? clientName(row.client),
+        },
         { header: 'Balance', accessor: (row) => money(row.balance) },
         { header: 'Status', accessor: (row) => row.status ?? '-' },
       ]}

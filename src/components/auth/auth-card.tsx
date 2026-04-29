@@ -20,13 +20,11 @@ export function AuthCard({
 }) {
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-950">
-      
-
       {/* Centered Card */}
       <Card
         className={cn(
           'w-full max-w-md border border-slate-200 bg-white p-8 shadow-xl',
-          className
+          className,
         )}
       >
         {/* Header */}
@@ -40,14 +38,10 @@ export function AuthCard({
         </div>
 
         {/* Title */}
-        <h2 className="mt-8 text-3xl font-black tracking-tight">
-          {title}
-        </h2>
+        <h2 className="mt-8 text-3xl font-black tracking-tight">{title}</h2>
 
         {/* Subtitle */}
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          {subtitle}
-        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{subtitle}</p>
 
         {/* Form */}
         <div className="mt-6">{children}</div>

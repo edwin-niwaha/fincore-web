@@ -11,7 +11,6 @@ export default function TransactionsPage() {
       title="Transactions"
       description="Posted and pending financial transactions from fincore-api."
       loader={resourcesApi.transactions.list}
-
       columns={[
         { header: 'Reference', accessor: (row) => row.reference ?? row.id },
         { header: 'Type', accessor: (row) => row.category ?? row.type ?? '-' },

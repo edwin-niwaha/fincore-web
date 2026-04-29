@@ -32,17 +32,25 @@ const iconMap: Record<string, LucideIcon> = {
   '/staff': LayoutDashboard,
   '/client': Home,
   '/clients': Users,
+  '/institutions': Landmark,
+  '/branches': Building2,
   '/savings': WalletCards,
   '/loans/applications': ClipboardList,
   '/loans/repayments': ListChecks,
   '/transactions': ReceiptText,
   '/reports': BarChart3,
-  '/users': Building2,
+  '/users': Users,
   '/audit-logs': FileText,
   '/settings': Settings,
 };
 
-export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+export function Sidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const role: Role | null = user?.role ?? null;
@@ -57,12 +65,16 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
     <aside
       className={cn(
         'hidden min-h-screen border-r border-slate-200 bg-white/95 shadow-sm backdrop-blur-xl transition-all duration-300 lg:flex lg:flex-col',
-        collapsed ? 'lg:w-[92px]' : 'lg:w-[280px]'
+        collapsed ? 'lg:w-[92px]' : 'lg:w-[280px]',
       )}
     >
       <div className="flex h-20 items-center justify-between border-b border-slate-200 px-4">
         {collapsed ? (
-          <Link href="/" className="grid h-11 w-11 place-items-center rounded-2xl bg-[#127D61] text-white shadow-sm" aria-label="FinCore home">
+          <Link
+            href="/"
+            className="grid h-11 w-11 place-items-center rounded-2xl bg-[#127D61] text-white shadow-sm"
+            aria-label="FinCore home"
+          >
             <Landmark className="h-5 w-5" />
           </Link>
         ) : (
@@ -75,14 +87,19 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-[#e8f5f1] hover:text-[#127D61]"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
         </button>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-5">
         {visibleItems.map((item) => {
           const Icon = iconMap[item.href] ?? LayoutDashboard;
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link
@@ -94,11 +111,13 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                 collapsed && 'justify-center px-0',
                 active
                   ? 'bg-[#127D61] text-white shadow-sm shadow-emerald-900/10'
-                  : 'text-slate-600 hover:bg-[#e8f5f1] hover:text-[#127D61]'
+                  : 'text-slate-600 hover:bg-[#e8f5f1] hover:text-[#127D61]',
               )}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {!collapsed ? <span className="truncate">{item.label}</span> : null}
+              {!collapsed ? (
+                <span className="truncate">{item.label}</span>
+              ) : null}
             </Link>
           );
         })}
@@ -108,8 +127,12 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         <div className={cn('rounded-2xl bg-slate-50 p-3', collapsed && 'px-2')}>
           {!collapsed ? (
             <div className="mb-3">
-              <p className="truncate text-sm font-black text-slate-900">{user?.first_name || user?.username || 'FinCore user'}</p>
-              <p className="truncate text-xs font-semibold text-slate-500">{String(user?.role ?? '').replaceAll('_', ' ')}</p>
+              <p className="truncate text-sm font-black text-slate-900">
+                {user?.first_name || user?.username || 'FinCore user'}
+              </p>
+              <p className="truncate text-xs font-semibold text-slate-500">
+                {String(user?.role ?? '').replaceAll('_', ' ')}
+              </p>
             </div>
           ) : null}
           <button
@@ -117,7 +140,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             onClick={() => void logout()}
             className={cn(
               'flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:text-[#127D61]',
-              collapsed && 'justify-center px-0'
+              collapsed && 'justify-center px-0',
             )}
             title="Logout"
           >

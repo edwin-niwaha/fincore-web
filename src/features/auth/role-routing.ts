@@ -6,8 +6,12 @@ export function dashboardPathForRole(role: Role | string) {
   return '/staff';
 }
 
-export function canAccessDashboard(role: Role | string, section: 'admin' | 'staff' | 'client') {
-  if (section === 'admin') return role === 'super_admin' || role === 'institution_admin';
+export function canAccessDashboard(
+  role: Role | string,
+  section: 'admin' | 'staff' | 'client',
+) {
+  if (section === 'admin')
+    return role === 'super_admin' || role === 'institution_admin';
   if (section === 'client') return role === 'client';
   return role !== 'client';
 }

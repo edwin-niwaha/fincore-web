@@ -29,7 +29,9 @@ export function useApiResource<T>(loader: () => Promise<T>) {
   }, [loader]);
 
   useEffect(() => {
-    void reload();
+    queueMicrotask(() => {
+      void reload();
+    });
   }, [reload]);
 
   return { data, error, isLoading, reload };

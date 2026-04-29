@@ -12,10 +12,19 @@ export default function LoanRepaymentsPage() {
       description="Recorded loan repayments from fincore-api."
       loader={resourcesApi.loanRepayments.list}
       columns={[
-        { header: 'Loan', accessor: (row) => (typeof row.loan_application === 'object' ? row.loan_application.id : row.loan_application ?? '-') },
+        {
+          header: 'Loan',
+          accessor: (row) =>
+            typeof row.loan_application === 'object'
+              ? row.loan_application.id
+              : (row.loan_application ?? '-'),
+        },
         { header: 'Amount', accessor: (row) => money(row.amount) },
         { header: 'Principal', accessor: (row) => money(row.principal_amount) },
-        { header: 'Date', accessor: (row) => row.paid_at ?? row.created_at ?? '-' },
+        {
+          header: 'Date',
+          accessor: (row) => row.paid_at ?? row.created_at ?? '-',
+        },
       ]}
     />
   );

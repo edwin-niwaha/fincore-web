@@ -1,5 +1,7 @@
-import { ApiContractTodo } from '@/components/features/api-contract-todo';
+'use client';
 
-export default function Page() {
-  return <ApiContractTodo title="Reports" description="Backend endpoint contract is documented here; no fake data is rendered." endpoint="/reports/" contract="{ results: [] } or paginated DRF response." />;
+import { TrialBalancePage } from '@/features/accounting/trial-balance-page';
+
+export default function ReportsPage() {
+  return <TrialBalancePage />;
 }

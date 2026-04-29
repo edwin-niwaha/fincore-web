@@ -8,7 +8,10 @@ import { unwrapList } from '@/lib/api/format';
 import { useApiResource } from '@/hooks/use-api-resource';
 import type { PaginatedResponse } from '@/types/api';
 
-export type ConnectedColumn<T> = { header: string; accessor: (row: T) => ReactNode };
+export type ConnectedColumn<T> = {
+  header: string;
+  accessor: (row: T) => ReactNode;
+};
 
 export function ConnectedResourcePage<T extends { id?: string | number }>({
   title,
@@ -23,15 +26,30 @@ export function ConnectedResourcePage<T extends { id?: string | number }>({
   columns: ConnectedColumn<T>[];
   emptyMessage?: string;
 }) {
-  const { data, error, isLoading, reload } = useApiResource<T[] | PaginatedResponse<T>>(loader);
+  const { data, error, isLoading, reload } = useApiResource<
+    T[] | PaginatedResponse<T>
+  >(loader);
 
-  if (isLoading) return <StateView title={`Loading ${title.toLowerCase()}...`} />;
-  if (error) return <StateView title={`Could not load ${title.toLowerCase()}`} description={error} actionLabel="Retry" onAction={reload} />;
+  if (isLoading)
+    return <StateView title={`Loading ${title.toLowerCase()}...`} />;
+  if (error)
+    return (
+      <StateView
+        title={`Could not load ${title.toLowerCase()}`}
+        description={error}
+        actionLabel="Retry"
+        onAction={reload}
+      />
+    );
 
   return (
     <div className="grid gap-6">
       <PageHeader title={title} description={description} />
-      <DataTable<T> data={unwrapList(data)} columns={columns} emptyMessage={emptyMessage} />
+      <DataTable<T>
+        data={unwrapList(data)}
+        columns={columns}
+        emptyMessage={emptyMessage}
+      />
     </div>
   );
 }

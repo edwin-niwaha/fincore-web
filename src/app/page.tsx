@@ -33,14 +33,17 @@ export default function LoginPage() {
     resolver: zodResolver(schema),
   });
 
-  async function redirectAfterAuth(user: Awaited<ReturnType<typeof login>>) {
-    if (!user.is_email_verified) {
-      router.replace('/verify-email');
-      return;
-    }
+  const redirectAfterAuth = useCallback(
+    async (user: Awaited<ReturnType<typeof login>>) => {
+      if (!user.is_email_verified) {
+        router.replace('/verify-email');
+        return;
+      }
 
-    router.replace(dashboardPathForRole(user.role));
-  }
+      router.replace(dashboardPathForRole(user.role));
+    },
+    [router],
+  );
 
   async function onSubmit(values: LoginForm) {
     const user = await login(values.email, values.password);
@@ -52,7 +55,7 @@ export default function LoginPage() {
       const user = await loginWithGoogle(accessToken);
       await redirectAfterAuth(user);
     },
-    [loginWithGoogle],
+    [loginWithGoogle, redirectAfterAuth],
   );
 
   const disabled = isSubmitting || isLoading;
@@ -94,19 +97,62 @@ export default function LoginPage() {
                 <circle cx="310" cy="260" r="210" fill="white" opacity="0.06" />
                 <circle cx="310" cy="260" r="150" fill="white" opacity="0.05" />
 
-                <rect x="100" y="90" width="420" height="300" rx="28" fill="white" opacity="0.98" />
-                <rect x="100" y="90" width="420" height="72" rx="28" fill="#127D61" />
+                <rect
+                  x="100"
+                  y="90"
+                  width="420"
+                  height="300"
+                  rx="28"
+                  fill="white"
+                  opacity="0.98"
+                />
+                <rect
+                  x="100"
+                  y="90"
+                  width="420"
+                  height="72"
+                  rx="28"
+                  fill="#127D61"
+                />
                 <rect x="100" y="130" width="420" height="34" fill="#127D61" />
 
                 <circle cx="145" cy="126" r="10" fill="#F79420" />
                 <circle cx="178" cy="126" r="10" fill="white" opacity="0.7" />
                 <circle cx="211" cy="126" r="10" fill="white" opacity="0.45" />
 
-                <rect x="130" y="190" width="130" height="20" rx="10" fill="#CBD5E1" />
-                <rect x="130" y="225" width="92" height="16" rx="8" fill="#E2E8F0" />
+                <rect
+                  x="130"
+                  y="190"
+                  width="130"
+                  height="20"
+                  rx="10"
+                  fill="#CBD5E1"
+                />
+                <rect
+                  x="130"
+                  y="225"
+                  width="92"
+                  height="16"
+                  rx="8"
+                  fill="#E2E8F0"
+                />
 
-                <rect x="340" y="188" width="130" height="46" rx="14" fill="#ECFDF5" />
-                <rect x="360" y="204" width="88" height="14" rx="7" fill="#127D61" />
+                <rect
+                  x="340"
+                  y="188"
+                  width="130"
+                  height="46"
+                  rx="14"
+                  fill="#ECFDF5"
+                />
+                <rect
+                  x="360"
+                  y="204"
+                  width="88"
+                  height="14"
+                  rx="7"
+                  fill="#127D61"
+                />
 
                 <path
                   d="M135 315 L210 268 L282 298 L362 225 L455 256"
@@ -134,13 +180,56 @@ export default function LoginPage() {
                   />
                 ))}
 
-                <rect x="130" y="345" width="95" height="18" rx="9" fill="#E2E8F0" />
-                <rect x="250" y="345" width="95" height="18" rx="9" fill="#E2E8F0" />
-                <rect x="370" y="345" width="95" height="18" rx="9" fill="#E2E8F0" />
+                <rect
+                  x="130"
+                  y="345"
+                  width="95"
+                  height="18"
+                  rx="9"
+                  fill="#E2E8F0"
+                />
+                <rect
+                  x="250"
+                  y="345"
+                  width="95"
+                  height="18"
+                  rx="9"
+                  fill="#E2E8F0"
+                />
+                <rect
+                  x="370"
+                  y="345"
+                  width="95"
+                  height="18"
+                  rx="9"
+                  fill="#E2E8F0"
+                />
 
-                <rect x="390" y="295" width="128" height="105" rx="24" fill="#F79420" />
-                <rect x="415" y="326" width="78" height="12" rx="6" fill="white" />
-                <rect x="415" y="352" width="52" height="12" rx="6" fill="white" opacity="0.75" />
+                <rect
+                  x="390"
+                  y="295"
+                  width="128"
+                  height="105"
+                  rx="24"
+                  fill="#F79420"
+                />
+                <rect
+                  x="415"
+                  y="326"
+                  width="78"
+                  height="12"
+                  rx="6"
+                  fill="white"
+                />
+                <rect
+                  x="415"
+                  y="352"
+                  width="52"
+                  height="12"
+                  rx="6"
+                  fill="white"
+                  opacity="0.75"
+                />
 
                 <circle cx="440" cy="62" r="22" fill="#F79420" opacity="0.9" />
                 <circle cx="535" cy="220" r="14" fill="white" opacity="0.35" />

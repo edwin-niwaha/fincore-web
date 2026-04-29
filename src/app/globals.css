@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --fincore-primary: #127d61;
@@ -25,10 +25,14 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(18, 125, 97, 0.08), transparent 32rem),
+    radial-gradient(
+      circle at top left,
+      rgba(18, 125, 97, 0.08),
+      transparent 32rem
+    ),
     linear-gradient(180deg, #ffffff 0%, var(--fincore-bg) 100%);
   color: var(--fincore-text);
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

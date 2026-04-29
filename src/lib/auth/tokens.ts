@@ -10,7 +10,9 @@ function canUseStorage() {
 export const tokenStore = {
   getAccess() {
     if (memoryAccessToken) return memoryAccessToken;
-    const token = canUseStorage() ? sessionStorage.getItem(ACCESS_TOKEN_KEY) : null;
+    const token = canUseStorage()
+      ? sessionStorage.getItem(ACCESS_TOKEN_KEY)
+      : null;
     memoryAccessToken = token;
     return token;
   },

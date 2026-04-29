@@ -24,12 +24,20 @@ export function Topbar({
             className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 lg:hidden"
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
 
           <div className="min-w-0">
-            <p className="truncate text-sm font-black text-slate-950">{user?.first_name || user?.email}</p>
-            <p className="truncate text-xs font-bold capitalize text-slate-500">{role || 'workspace user'}</p>
+            <p className="truncate text-sm font-black text-slate-950">
+              {user?.first_name || user?.email}
+            </p>
+            <p className="truncate text-xs font-bold capitalize text-slate-500">
+              {role || 'workspace user'}
+            </p>
           </div>
         </div>
 
@@ -45,10 +53,18 @@ export function Topbar({
           <span className="hidden items-center gap-2 rounded-full bg-[#e8f5f1] px-3 py-2 text-xs font-black text-[#127D61] sm:inline-flex">
             <ShieldCheck className="h-4 w-4" /> Secure
           </span>
-          <button className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600" aria-label="Notifications">
+          <button
+            className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600"
+            aria-label="Notifications"
+          >
             <Bell className="h-5 w-5" />
           </button>
-          <Button onClick={() => void logout()} className="bg-[#127D61] text-white hover:bg-[#0f6b53]">Logout</Button>
+          <Button
+            onClick={() => void logout()}
+            className="bg-[#127D61] text-white hover:bg-[#0f6b53]"
+          >
+            Logout
+          </Button>
         </div>
       </div>
     </header>

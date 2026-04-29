@@ -17,12 +17,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-slate-50 text-slate-950">
-        <div className={cn('grid min-h-screen transition-[grid-template-columns] duration-300', collapsed ? 'lg:grid-cols-[92px_1fr]' : 'lg:grid-cols-[280px_1fr]')}>
-          <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
+        <div
+          className={cn(
+            'grid min-h-screen transition-[grid-template-columns] duration-300',
+            collapsed ? 'lg:grid-cols-[92px_1fr]' : 'lg:grid-cols-[280px_1fr]',
+          )}
+        >
+          <Sidebar
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((value) => !value)}
+          />
           <div className="min-w-0">
-            <Topbar mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} />
-            {mobileOpen ? <div className="border-b border-slate-200 bg-white px-4 py-4 shadow-sm lg:hidden"><MobileDashboardNav onNavigate={() => setMobileOpen(false)} /></div> : null}
-            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+            <Topbar
+              mobileOpen={mobileOpen}
+              onMobileOpenChange={setMobileOpen}
+            />
+            {mobileOpen ? (
+              <div className="border-b border-slate-200 bg-white px-4 py-4 shadow-sm lg:hidden">
+                <MobileDashboardNav onNavigate={() => setMobileOpen(false)} />
+              </div>
+            ) : null}
+            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+              {children}
+            </main>
           </div>
         </div>
       </div>
@@ -37,14 +54,29 @@ function MobileDashboardNav({ onNavigate }: { onNavigate: () => void }) {
 
   return (
     <nav className="grid gap-2">
-      {navItems.filter((item) => !item.roles || (role ? item.roles.includes(role) : false)).map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        return (
-          <Link key={item.href} href={item.href} onClick={onNavigate} className={cn('rounded-2xl px-4 py-3 text-sm font-bold transition', active ? 'bg-[#127D61] text-white' : 'bg-slate-50 text-slate-700 hover:bg-[#e8f5f1] hover:text-[#127D61]')}>
-            {item.label}
-          </Link>
-        );
-      })}
+      {navItems
+        .filter(
+          (item) => !item.roles || (role ? item.roles.includes(role) : false),
+        )
+        .map((item) => {
+          const active =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className={cn(
+                'rounded-2xl px-4 py-3 text-sm font-bold transition',
+                active
+                  ? 'bg-[#127D61] text-white'
+                  : 'bg-slate-50 text-slate-700 hover:bg-[#e8f5f1] hover:text-[#127D61]',
+              )}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
     </nav>
   );
 }

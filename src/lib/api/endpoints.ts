@@ -20,8 +20,26 @@ export const endpoints = {
     client: '/api/v1/dashboards/client/',
   },
 
+  institutions: '/api/v1/institutions/',
+  institutionDetail: (id: string | number) => `/api/v1/institutions/${id}/`,
+  branches: '/api/v1/branches/',
+  branchDetail: (id: string | number) => `/api/v1/branches/${id}/`,
+  users: '/api/v1/users/',
+  userDetail: (id: string | number) => `/api/v1/users/${id}/`,
   clients: '/api/v1/clients/',
   clientDetail: (id: string | number) => `/api/v1/clients/${id}/`,
+  clientMe: '/api/v1/clients/me/',
+  accountingAccounts: '/api/v1/accounting/accounts/',
+  accountingAccountDetail: (id: string | number) =>
+    `/api/v1/accounting/accounts/${id}/`,
+  accountingJournalEntries: '/api/v1/accounting/journal-entries/',
+  accountingJournalEntryDetail: (id: string | number) =>
+    `/api/v1/accounting/journal-entries/${id}/`,
+  accountingJournalEntryPost: (id: string | number) =>
+    `/api/v1/accounting/journal-entries/${id}/post/`,
+  reports: {
+    trialBalance: '/api/v1/reports/trial-balance/',
+  },
   savingsAccounts: '/api/v1/savings/accounts/',
   loanApplications: '/api/v1/loans/applications/',
   loanRepayments: '/api/v1/loans/repayments/',

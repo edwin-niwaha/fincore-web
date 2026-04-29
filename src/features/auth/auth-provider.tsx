@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api/services';
 import { tokenStore } from '@/lib/auth/tokens';
@@ -40,18 +47,25 @@ function applyAuthResponse(response: LoginResponse) {
 
 export function getFriendlyError(error: unknown) {
   const problem = error as ApiProblem;
-  if (problem?.status === 401) return 'Invalid login details. Please check your email and password.';
-  if (problem?.status === 403) return 'You do not have permission to perform this action.';
-  if (problem?.status === 429) return 'Too many attempts. Please wait a moment and try again.';
+  if (problem?.status === 401)
+    return 'Invalid login details. Please check your email and password.';
+  if (problem?.status === 403)
+    return 'You do not have permission to perform this action.';
+  if (problem?.status === 429)
+    return 'Too many attempts. Please wait a moment and try again.';
   if (problem?.message) return problem.message;
   return 'Something went wrong. Please try again.';
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() =>
+    Boolean(tokenStore.getAccess() || tokenStore.getRefresh()),
+  );
 
   const reloadProfile = useCallback(async () => {
+    setIsLoading(true);
+
     if (!tokenStore.getAccess() && !tokenStore.getRefresh()) {
       setUser(null);
       setIsLoading(false);
@@ -72,8 +86,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void reloadProfile();
-  }, [reloadProfile]);
+    let isActive = true;
+
+    async function hydrateProfile() {
+      if (!tokenStore.getAccess() && !tokenStore.getRefresh()) {
+        if (isActive) {
+          setUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const profile = normalizeUser(await authApi.profile());
+        if (isActive) setUser(profile);
+      } catch {
+        tokenStore.clear();
+        if (isActive) setUser(null);
+      } finally {
+        if (isActive) setIsLoading(false);
+      }
+    }
+
+    queueMicrotask(() => {
+      void hydrateProfile();
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   async function login(email: string, password: string) {
     try {
@@ -101,7 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function loginWithGoogle(accessToken: string) {
     try {
-      const profile = applyAuthResponse(await authApi.loginWithGoogle(accessToken));
+      const profile = applyAuthResponse(
+        await authApi.loginWithGoogle(accessToken),
+      );
       setUser(profile);
       toast.success('Signed in with Google');
       return profile;
@@ -148,8 +192,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = useMemo(
-    () => ({ user, isAuthenticated: Boolean(user), isLoading, login, register, loginWithGoogle, verifyEmail, resendEmailVerification, logout, reloadProfile }),
-    [user, isLoading, reloadProfile]
+    () => ({
+      user,
+      isAuthenticated: Boolean(user),
+      isLoading,
+      login,
+      register,
+      loginWithGoogle,
+      verifyEmail,
+      resendEmailVerification,
+      logout,
+      reloadProfile,
+    }),
+    [user, isLoading, reloadProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -55,7 +55,6 @@ fincore-web/
 └── .env.example
 ```
 
-
 ---
 
 ## ⚙️ Setup
@@ -70,9 +69,11 @@ cp .env.example .env.local
 
 npm run dev
 
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 
 npm run dev
 npm run build
 npm run lint
+npm run check
+```
