@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { navItems } from '@/components/layout/nav-config';
 import { StateView } from '@/components/ui/state-view';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -22,18 +22,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const allowedRoles = user ? allowedRolesForPath(pathname) : null;
   const isUnauthorized =
     Boolean(user && allowedRoles && !allowedRoles.includes(user.role));
 
   useEffect(() => {
-    if (!mounted || isLoading) return;
+    if (isLoading) return;
 
     if (!user) {
       router.replace('/login');
@@ -49,16 +44,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
       router.replace(dashboardPathForRole(user.role));
     }
   }, [
-    mounted,
     isLoading,
+    user,
     router,
-    user?.id,
-    user?.role,
-    user?.is_email_verified,
     isUnauthorized,
   ]);
 
-  if (!mounted || isLoading) {
+  if (isLoading) {
     return <StateView title="Loading your workspace..." />;
   }
 

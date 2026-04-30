@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
 import type { Column } from '@/components/ui/data-table';
 import { DataTable } from '@/components/ui/data-table';
@@ -249,10 +250,19 @@ export function TrialBalancePage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader
-        title="Trial balance"
-        description="Review posted debits and credits by ledger account as of a chosen reporting date."
-      />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader
+          title="Trial balance"
+          description="Review posted debits and credits by ledger account as of a chosen reporting date."
+        />
+        <Button
+          type="button"
+          className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 print-hidden"
+          onClick={() => window.print()}
+        >
+          Print
+        </Button>
+      </div>
 
       <Card className="grid gap-4">
         <CardTitle>Report filters</CardTitle>
@@ -304,6 +314,13 @@ export function TrialBalancePage() {
             />
           </Field>
         </div>
+
+        <div
+          className={`alert ${Number(data?.totals?.difference ?? 0) === 0 ? 'alert-success' : 'alert-danger'}`}
+        >
+          Report date: <strong>{formatDate(asOf)}</strong>. Difference:{' '}
+          <strong>{moneyPrecise(data?.totals?.difference)}</strong>.
+        </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -339,6 +356,24 @@ export function TrialBalancePage() {
           data={rows}
           columns={columns}
           emptyMessage="No posted journal activity matched this reporting scope."
+          tableFooter={
+            <tfoot>
+              <tr>
+                <td colSpan={2} className="font-bold text-slate-900">
+                  Totals
+                </td>
+                <td className="text-right font-bold text-slate-900">
+                  {moneyPrecise(data?.totals?.debit)}
+                </td>
+                <td className="text-right font-bold text-slate-900">
+                  {moneyPrecise(data?.totals?.credit)}
+                </td>
+                <td className="text-right font-bold text-slate-900">
+                  {moneyPrecise(data?.totals?.difference)}
+                </td>
+              </tr>
+            </tfoot>
+          }
         />
       </Card>
     </div>

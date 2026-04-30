@@ -17,13 +17,23 @@ export function ApiContractTodo({
   return (
     <div className="grid gap-6">
       <PageHeader title={title} description={description} />
-      <Card>
-        <CardTitle>API contract TODO</CardTitle>
-        <p className="mt-2 text-sm text-slate-600">
-          This page does not use mock production data. Connect it after the
-          backend endpoint is available.
-        </p>
-        <pre className="mt-4 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-white">{`${method} ${endpoint}\n\n${contract}`}</pre>
+      <Card className="overflow-hidden p-0">
+        <div className="card-header">
+          <div>
+            <CardTitle>API contract TODO</CardTitle>
+            <p className="mt-1 text-sm text-slate-600">
+              This page does not use mock production data. Connect it after the
+              backend endpoint is available.
+            </p>
+          </div>
+        </div>
+        <div className="card-body">
+          <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            The frontend is waiting for a live API contract before this workspace
+            can be completed safely.
+          </p>
+          <pre className="mt-4 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-white">{`${method} ${endpoint}\n\n${contract}`}</pre>
+        </div>
       </Card>
     </div>
   );

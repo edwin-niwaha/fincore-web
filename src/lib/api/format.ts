@@ -10,41 +10,55 @@ export function unwrapList<T>(
   return Array.isArray(data) ? data : (data.results ?? []);
 }
 
+export function isPaginatedResponse<T>(
+  data: T[] | PaginatedResponse<T> | null | undefined,
+): data is PaginatedResponse<T> {
+  return Boolean(data && !Array.isArray(data));
+}
+
+export function listCount<T>(
+  data: T[] | PaginatedResponse<T> | null | undefined,
+): number {
+  if (!data) return 0;
+  return Array.isArray(data) ? data.length : data.count;
+}
+
 /**
  * Format money safely (SSR-compatible)
  */
-export function money(value?: string | number | null): string {
+export function currencyMoney(
+  value?: string | number | null,
+  currency = 'UGX',
+  options?: {
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+  },
+): string {
   const amount = Number(value ?? 0);
 
-  if (Number.isNaN(amount)) return 'UGX 0';
+  if (Number.isNaN(amount)) return `${currency} 0`;
 
   try {
     return new Intl.NumberFormat('en-UG', {
       style: 'currency',
-      currency: 'UGX',
-      maximumFractionDigits: 0,
+      currency,
+      minimumFractionDigits: options?.minimumFractionDigits,
+      maximumFractionDigits: options?.maximumFractionDigits,
     }).format(amount);
   } catch {
-    // Fallback (very rare, but safe for SSR edge cases)
-    return `UGX ${amount.toLocaleString()}`;
+    return `${currency} ${amount.toLocaleString()}`;
   }
 }
 
+export function money(value?: string | number | null): string {
+  return currencyMoney(value, 'UGX', { maximumFractionDigits: 0 });
+}
+
 export function moneyPrecise(value?: string | number | null): string {
-  const amount = Number(value ?? 0);
-
-  if (Number.isNaN(amount)) return 'UGX 0.00';
-
-  try {
-    return new Intl.NumberFormat('en-UG', {
-      style: 'currency',
-      currency: 'UGX',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `UGX ${amount.toFixed(2)}`;
-  }
+  return currencyMoney(value, 'UGX', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 /**

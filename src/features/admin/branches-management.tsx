@@ -2,21 +2,23 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/layout/page-header';
+import { RecordsListPanel } from '@/components/records/records-list-panel';
+import { RecordsPageLayout } from '@/components/records/records-page-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
 import type { Column } from '@/components/ui/data-table';
 import { DataTable } from '@/components/ui/data-table';
 import { Field, Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
+import { RowActions } from '@/components/ui/row-actions';
 import { StateView } from '@/components/ui/state-view';
-import { useAuth } from '@/features/auth/auth-provider';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   formSelectClassName,
   formatDate,
   organizationStatusOptions,
-  statusLabel,
-  statusPillClassName,
 } from '@/features/admin/shared';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useApiResource } from '@/hooks/use-api-resource';
 import { unwrapList } from '@/lib/api/format';
 import { adminApi } from '@/lib/api/services';
@@ -59,12 +61,15 @@ function getErrorMessage(error: unknown) {
 }
 
 export function BranchesManagementPage() {
-  const { user } = useAuth();
+  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [institutionFilter, setInstitutionFilter] = useState('all');
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
   const loadInstitutions = useCallback(() => adminApi.institutions.list(), []);
   const {
@@ -99,11 +104,31 @@ export function BranchesManagementPage() {
   } = useApiResource(loadBranches);
 
   const branches = unwrapList(branchesData);
-  const activeBranches = branches.filter(
+  const filteredBranches = useMemo(
+    () =>
+      branches.filter((branch) => {
+        if (!debouncedSearch) return true;
+
+        return [
+          branch.name,
+          branch.code,
+          branch.address,
+          branch.institution_name,
+          branch.institution_code,
+          branch.status,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(debouncedSearch.toLowerCase());
+      }),
+    [branches, debouncedSearch],
+  );
+  const activeBranches = filteredBranches.filter(
     (branch) => branch.status === 'active',
   ).length;
   const institutionsRepresented = new Set(
-    branches.map(
+    filteredBranches.map(
       (branch) => branch.institution_name || branch.institution_code,
     ),
   ).size;
@@ -116,6 +141,26 @@ export function BranchesManagementPage() {
   );
 
   const canChooseInstitution = availableInstitutions.length > 1;
+  const formId = 'branch-form';
+
+  function openCreateModal() {
+    setEditingBranchId(null);
+    setFormError(null);
+    setForm(createEmptyBranchForm(defaultInstitutionId));
+    setIsFormOpen(true);
+  }
+
+  function openEditModal(branch: Branch) {
+    setEditingBranchId(String(branch.id));
+    setFormError(null);
+    setForm(branchFormFromRecord(branch));
+    setIsFormOpen(true);
+  }
+
+  function closeFormModal() {
+    setIsFormOpen(false);
+    setFormError(null);
+  }
 
   const columns: Column<Branch>[] = [
     {
@@ -148,15 +193,7 @@ export function BranchesManagementPage() {
     },
     {
       header: 'Status',
-      accessor: (branch) => (
-        <span
-          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusPillClassName(
-            branch.status,
-          )}`}
-        >
-          {statusLabel(branch.status)}
-        </span>
-      ),
+      accessor: (branch) => <StatusBadge status={branch.status} />,
     },
     {
       header: 'Updated',
@@ -165,49 +202,48 @@ export function BranchesManagementPage() {
     {
       header: 'Actions',
       accessor: (branch) => (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-            onClick={() => {
-              setEditingBranchId(String(branch.id));
-              setForm(branchFormFromRecord(branch));
-            }}
-          >
-            Edit
-          </Button>
-          <Button
-            type="button"
-            className="bg-red-50 text-red-700 hover:bg-red-100"
-            disabled={deletingBranchId === String(branch.id)}
-            onClick={async () => {
-              if (
-                !window.confirm(`Delete ${branch.name}? This cannot be undone.`)
-              ) {
-                return;
-              }
-
-              setDeletingBranchId(String(branch.id));
-
-              try {
-                await adminApi.branches.remove(branch.id);
-                toast.success('Branch deleted');
-                if (editingBranchId === String(branch.id)) {
-                  setEditingBranchId(null);
-                  setForm(createEmptyBranchForm(defaultInstitutionId));
+        <RowActions
+          actions={[
+            {
+              key: 'edit',
+              label: 'Edit',
+              onClick: () => openEditModal(branch),
+            },
+            {
+              key: 'delete',
+              label: 'Delete',
+              disabled: deletingBranchId === String(branch.id),
+              tone: 'danger',
+              onClick: async () => {
+                if (
+                  !window.confirm(`Delete ${branch.name}? This cannot be undone.`)
+                ) {
+                  return;
                 }
-                await reloadBranches();
-              } catch (deleteError) {
-                toast.error(getErrorMessage(deleteError));
-              } finally {
-                setDeletingBranchId(null);
-              }
-            }}
-          >
-            Delete
-          </Button>
-        </div>
+
+                setDeletingBranchId(String(branch.id));
+
+                try {
+                  await adminApi.branches.remove(branch.id);
+                  toast.success('Branch deleted');
+                  if (editingBranchId === String(branch.id)) {
+                    setEditingBranchId(null);
+                    setForm(createEmptyBranchForm(defaultInstitutionId));
+                    setIsFormOpen(false);
+                  }
+                  await reloadBranches();
+                } catch (deleteError) {
+                  toast.error(getErrorMessage(deleteError));
+                } finally {
+                  setDeletingBranchId(null);
+                }
+              },
+            },
+          ]}
+          align="end"
+        />
       ),
+      align: 'right',
     },
   ];
 
@@ -242,50 +278,42 @@ export function BranchesManagementPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="Branches"
-        description="Manage branch setup, visibility, and institution assignment within your admin scope."
-      />
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">
-            Branches in scope
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {branches.length}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">
-            Active branches
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {activeBranches}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">
-            Institutions represented
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {institutionsRepresented}
-          </p>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+    <RecordsPageLayout
+      title="Branches"
+      description="Manage branch setup, visibility, and institution assignment within your admin scope."
+      metrics={[
+        {
+          label: 'Branches in scope',
+          value: filteredBranches.length,
+          hint: 'Matching the current filters and search.',
+          accent: 'slate',
+        },
+        {
+          label: 'Active branches',
+          value: activeBranches,
+          hint: 'Currently marked active in this view.',
+        },
+        {
+          label: 'Institutions represented',
+          value: institutionsRepresented,
+          hint: 'Distinct institutions in the current results.',
+          accent: 'amber',
+        },
+      ]}
+      filterPanel={
         <Card className="grid gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Branch directory</CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
-                Branch actions are automatically scoped by your admin role.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {canChooseInstitution ? (
+          <CardTitle>Search and filters</CardTitle>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Field label="Search">
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Branch name, code, address, or institution"
+              />
+            </Field>
+
+            {canChooseInstitution ? (
+              <Field label="Institution">
                 <select
                   className={formSelectClassName}
                   value={institutionFilter}
@@ -298,7 +326,10 @@ export function BranchesManagementPage() {
                     </option>
                   ))}
                 </select>
-              ) : null}
+              </Field>
+            ) : null}
+
+            <Field label="Status">
               <select
                 className={formSelectClassName}
                 value={statusFilter}
@@ -310,187 +341,212 @@ export function BranchesManagementPage() {
                   </option>
                 ))}
               </select>
+            </Field>
+          </div>
+        </Card>
+      }
+    >
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+        <RecordsListPanel
+          title="Branch directory"
+          description="Branch actions are automatically scoped by your admin role."
+          action={
+            <Button type="button" className="whitespace-nowrap" onClick={openCreateModal}>
+              New branch
+            </Button>
+          }
+        >
+          <div className="p-5">
+            <DataTable
+              data={filteredBranches}
+              columns={columns}
+              emptyTitle="No branches found"
+              emptyMessage="Try widening the current filters or search terms."
+            />
+          </div>
+        </RecordsListPanel>
+      </div>
+
+      {!availableInstitutions.length ? (
+        <Card>
+          <CardTitle>Branch setup needs an active institution</CardTitle>
+          <p className="mt-2 text-sm text-slate-600">
+            Create or reactivate an institution before adding new branches in this
+            workspace.
+          </p>
+        </Card>
+      ) : null}
+
+      {isFormOpen ? (
+        <Modal
+          open={isFormOpen}
+          onClose={closeFormModal}
+          size="lg"
+          title={editingBranchId ? 'Edit branch' : 'Create branch'}
+          description={
+            editingBranchId
+              ? 'Update the selected branch and save your changes.'
+              : 'Add a branch within an institution you are allowed to manage.'
+          }
+          footer={
+            <>
               <Button
                 type="button"
-                className="whitespace-nowrap"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
                 onClick={() => {
-                  setEditingBranchId(null);
+                  if (selectedBranch) {
+                    setFormError(null);
+                    setForm(branchFormFromRecord(selectedBranch));
+                    return;
+                  }
+                  setFormError(null);
                   setForm(createEmptyBranchForm(defaultInstitutionId));
                 }}
               >
-                New branch
+                {selectedBranch ? 'Reset form' : 'Clear form'}
               </Button>
-            </div>
-          </div>
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={closeFormModal}
+              >
+                Cancel
+              </Button>
+              <Button form={formId} type="submit" disabled={isSaving}>
+                {isSaving
+                  ? 'Saving...'
+                  : editingBranchId
+                    ? 'Save changes'
+                    : 'Create branch'}
+              </Button>
+            </>
+          }
+        >
+          <form
+            id={formId}
+            className="grid gap-4"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setIsSaving(true);
+              setFormError(null);
 
-          <DataTable
-            data={branches}
-            columns={columns}
-            emptyMessage="No branches matched this filter."
-          />
-        </Card>
+              try {
+                const payload = {
+                  institution: form.institution || defaultInstitutionId,
+                  name: form.name.trim(),
+                  code: form.code.trim(),
+                  address: form.address.trim(),
+                  status: form.status,
+                };
 
-        <Card>
-          <CardTitle>
-            {editingBranchId ? 'Edit branch' : 'Create branch'}
-          </CardTitle>
-          <p className="mt-2 text-sm text-slate-500">
-            {editingBranchId
-              ? 'Update the selected branch and save your changes.'
-              : 'Add a branch within an institution you are allowed to manage.'}
-          </p>
+                await (editingBranchId
+                  ? adminApi.branches.update(editingBranchId, payload)
+                  : adminApi.branches.create(payload));
 
-          {!availableInstitutions.length ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-              No institutions are currently available in your scope. Create or
-              activate an institution first.
-            </div>
-          ) : (
-            <form
-              className="mt-4 grid gap-4"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                setIsSaving(true);
-
-                try {
-                  const payload = {
-                    institution: form.institution || defaultInstitutionId,
-                    name: form.name.trim(),
-                    code: form.code.trim(),
-                    address: form.address.trim(),
-                    status: form.status,
-                  };
-
-                  const savedBranch = editingBranchId
-                    ? await adminApi.branches.update(editingBranchId, payload)
-                    : await adminApi.branches.create(payload);
-
-                  toast.success(
-                    editingBranchId ? 'Branch updated' : 'Branch created',
-                  );
-                  setEditingBranchId(String(savedBranch.id));
-                  setForm(branchFormFromRecord(savedBranch));
-                  await reloadBranches();
-                  await reloadInstitutions();
-                } catch (saveError) {
-                  toast.error(getErrorMessage(saveError));
-                } finally {
-                  setIsSaving(false);
+                toast.success(editingBranchId ? 'Branch updated' : 'Branch created');
+                closeFormModal();
+                setEditingBranchId(null);
+                setForm(createEmptyBranchForm(defaultInstitutionId));
+                await reloadBranches();
+                await reloadInstitutions();
+              } catch (saveError) {
+                const message = getErrorMessage(saveError);
+                setFormError(message);
+                toast.error(message);
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          >
+            <Field label="Institution">
+              <select
+                className={formSelectClassName}
+                value={form.institution || defaultInstitutionId}
+                disabled={!canChooseInstitution}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    institution: event.target.value,
+                  }))
                 }
-              }}
-            >
-              <Field label="Institution">
-                <select
-                  className={formSelectClassName}
-                  value={form.institution || defaultInstitutionId}
-                  disabled={!canChooseInstitution}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      institution: event.target.value,
-                    }))
-                  }
-                >
-                  {!canChooseInstitution && defaultInstitutionId ? null : (
-                    <option value="">Select an institution</option>
-                  )}
-                  {availableInstitutions.map((institution) => (
-                    <option key={institution.id} value={String(institution.id)}>
-                      {institution.name}
+              >
+                {!canChooseInstitution && defaultInstitutionId ? null : (
+                  <option value="">Select an institution</option>
+                )}
+                {availableInstitutions.map((institution) => (
+                  <option key={institution.id} value={String(institution.id)}>
+                    {institution.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Branch name">
+              <Input
+                value={form.name}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Main Branch"
+                required
+              />
+            </Field>
+
+            <Field label="Code">
+              <Input
+                value={form.code}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    code: event.target.value,
+                  }))
+                }
+                placeholder="main-branch"
+                required
+              />
+            </Field>
+
+            <Field label="Address">
+              <Input
+                value={form.address}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    address: event.target.value,
+                  }))
+                }
+                placeholder="Plot 1 Kampala Road"
+              />
+            </Field>
+
+            <Field label="Status">
+              <select
+                className={formSelectClassName}
+                value={form.status}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    status: event.target.value,
+                  }))
+                }
+              >
+                {organizationStatusOptions
+                  .filter((option) => option.value !== 'all')
+                  .map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
-                </select>
-              </Field>
+              </select>
+            </Field>
 
-              <Field label="Branch name">
-                <Input
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="Main Branch"
-                  required
-                />
-              </Field>
-
-              <Field label="Code">
-                <Input
-                  value={form.code}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      code: event.target.value,
-                    }))
-                  }
-                  placeholder="main-branch"
-                  required
-                />
-              </Field>
-
-              <Field label="Address">
-                <Input
-                  value={form.address}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      address: event.target.value,
-                    }))
-                  }
-                  placeholder="Plot 1 Kampala Road"
-                />
-              </Field>
-
-              <Field label="Status">
-                <select
-                  className={formSelectClassName}
-                  value={form.status}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      status: event.target.value,
-                    }))
-                  }
-                >
-                  {organizationStatusOptions
-                    .filter((option) => option.value !== 'all')
-                    .map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving
-                    ? 'Saving...'
-                    : editingBranchId
-                      ? 'Save changes'
-                      : 'Create branch'}
-                </Button>
-                <Button
-                  type="button"
-                  className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                  onClick={() => {
-                    if (selectedBranch) {
-                      setForm(branchFormFromRecord(selectedBranch));
-                      return;
-                    }
-                    setEditingBranchId(null);
-                    setForm(createEmptyBranchForm(defaultInstitutionId));
-                  }}
-                >
-                  {selectedBranch ? 'Reset form' : 'Clear form'}
-                </Button>
-              </div>
-            </form>
-          )}
-        </Card>
-      </div>
-    </div>
+            {formError ? <div className="alert alert-danger">{formError}</div> : null}
+          </form>
+        </Modal>
+      ) : null}
+    </RecordsPageLayout>
   );
 }

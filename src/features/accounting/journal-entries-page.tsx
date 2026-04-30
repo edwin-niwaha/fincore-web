@@ -8,6 +8,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import type { Column } from '@/components/ui/data-table';
 import { DataTable } from '@/components/ui/data-table';
 import { Field, Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 import { StateView } from '@/components/ui/state-view';
 import {
   formSelectClassName,
@@ -186,6 +187,8 @@ export function JournalEntriesPage() {
     fixedBranchId || 'all',
   );
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [form, setForm] = useState<JournalFormState>(() =>
@@ -299,6 +302,75 @@ export function JournalEntriesPage() {
     entries.find((entry) => String(entry.id) === editingEntryId) ?? null;
   const totals = formTotals(form.lines);
   const difference = totals.debit - totals.credit;
+  const formId = 'journal-entry-form';
+
+  function resetJournalForm() {
+    setEditingEntryId(null);
+    setFormError(null);
+    setForm(createEmptyJournalForm(defaultInstitutionId, fixedBranchId));
+  }
+
+  function openCreateModal() {
+    resetJournalForm();
+    setIsFormOpen(true);
+  }
+
+  function openEditModal(entry: JournalEntry) {
+    setEditingEntryId(String(entry.id));
+    setFormError(null);
+    setForm(journalFormFromRecord(entry));
+    setIsFormOpen(true);
+  }
+
+  function closeFormModal() {
+    setIsFormOpen(false);
+    setFormError(null);
+  }
+
+  async function saveJournalEntry(status: 'draft' | 'posted') {
+    setIsSaving(true);
+    setFormError(null);
+
+    try {
+      const payload = {
+        institution: selectedInstitutionId || defaultInstitutionId,
+        branch: selectedBranchId || null,
+        reference: form.reference.trim(),
+        description: form.description.trim(),
+        entry_date: form.entry_date,
+        status,
+        lines: form.lines.map((line) => ({
+          account: line.account,
+          description: line.description.trim(),
+          debit: line.debit || '0.00',
+          credit: line.credit || '0.00',
+        })),
+      };
+
+      const savedEntry = editingEntryId
+        ? await accountingApi.journalEntries.update(editingEntryId, payload)
+        : await accountingApi.journalEntries.create(payload);
+
+      toast.success(status === 'posted' ? 'Journal entry posted' : editingEntryId ? 'Draft updated' : 'Draft saved');
+      closeFormModal();
+      resetJournalForm();
+      await reload();
+      if (savedEntry.institution) {
+        await reloadAccounts();
+      }
+    } catch (saveError) {
+      const message = getProblemMessage(
+        saveError,
+        status === 'posted'
+          ? 'Unable to post journal entry.'
+          : 'Unable to save journal entry changes.',
+      );
+      setFormError(message);
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   const columns: Column<JournalEntry>[] = [
     {
@@ -361,17 +433,14 @@ export function JournalEntriesPage() {
             <>
               <Button
                 type="button"
-                className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                onClick={() => {
-                  setEditingEntryId(String(entry.id));
-                  setForm(journalFormFromRecord(entry));
-                }}
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={() => openEditModal(entry)}
               >
                 Edit
               </Button>
               <Button
                 type="button"
-                className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                className="btn-success-soft bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                 onClick={async () => {
                   try {
                     await accountingApi.journalEntries.post(entry.id);
@@ -388,7 +457,7 @@ export function JournalEntriesPage() {
               </Button>
               <Button
                 type="button"
-                className="bg-red-50 text-red-700 hover:bg-red-100"
+                className="btn-outline-danger bg-red-50 text-red-700 hover:bg-red-100"
                 disabled={deletingEntryId === String(entry.id)}
                 onClick={async () => {
                   if (
@@ -404,10 +473,8 @@ export function JournalEntriesPage() {
                     await accountingApi.journalEntries.remove(entry.id);
                     toast.success('Draft journal entry deleted');
                     if (editingEntryId === String(entry.id)) {
-                      setEditingEntryId(null);
-                      setForm(
-                        createEmptyJournalForm(defaultInstitutionId, fixedBranchId),
-                      );
+                      resetJournalForm();
+                      setIsFormOpen(false);
                     }
                     await reload();
                   } catch (deleteError) {
@@ -508,11 +575,16 @@ export function JournalEntriesPage() {
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <Card className="grid gap-4">
           <div className="flex flex-col gap-3">
-            <div>
-              <CardTitle>Journal register</CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
-                Draft entries can be edited and posted; system-generated entries stay read-only.
-              </p>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <CardTitle>Journal register</CardTitle>
+                <p className="mt-1 text-sm text-slate-500">
+                  Draft entries can be edited and posted; system-generated entries stay read-only.
+                </p>
+              </div>
+              <Button type="button" onClick={openCreateModal}>
+                New journal entry
+              </Button>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -597,32 +669,61 @@ export function JournalEntriesPage() {
             emptyMessage="No journal entries matched this filter."
           />
         </Card>
+      </div>
 
-        <Card className="grid gap-4 self-start">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <CardTitle>
-                {editingEntryId ? 'Edit draft journal' : 'New journal entry'}
-              </CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
-                Build the lines first, then save as draft or post once debits and credits match.
-              </p>
-            </div>
-            {editingEntryId ? (
+      {isFormOpen ? (
+        <Modal
+          open={isFormOpen}
+          onClose={closeFormModal}
+          size="2xl"
+          title={editingEntryId ? 'Edit draft journal' : 'New journal entry'}
+          description="Build the lines first, then save as draft or post once debits and credits match."
+          footer={
+            <>
               <Button
                 type="button"
-                className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
                 onClick={() => {
-                  setEditingEntryId(null);
-                  setForm(createEmptyJournalForm(defaultInstitutionId, fixedBranchId));
+                  if (selectedEntry) {
+                    setFormError(null);
+                    setForm(journalFormFromRecord(selectedEntry));
+                    return;
+                  }
+                  resetJournalForm();
                 }}
               >
-                New
+                {selectedEntry ? 'Reset form' : 'Clear form'}
               </Button>
-            ) : null}
-          </div>
-
-          <div className="grid gap-3 rounded-2xl bg-slate-50 p-4">
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={closeFormModal}
+              >
+                Cancel
+              </Button>
+              <Button
+                form={formId}
+                type="submit"
+                value="draft"
+                name="intent"
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save draft'}
+              </Button>
+              <Button
+                form={formId}
+                type="submit"
+                value="posted"
+                name="intent"
+                disabled={isSaving}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                Post entry
+              </Button>
+            </>
+          }
+        >
+          <div className="grid gap-4 rounded-2xl bg-slate-50 p-4">
             <div className="flex items-center justify-between text-sm">
               <span className="font-semibold text-slate-500">Debit total</span>
               <span className="font-bold text-slate-900">
@@ -646,11 +747,18 @@ export function JournalEntriesPage() {
           </div>
 
           <form
-            className="grid gap-4"
-            onSubmit={(event) => {
+            id={formId}
+            className="mt-4 grid gap-4"
+            onSubmit={async (event) => {
               event.preventDefault();
+              const nativeEvent = event.nativeEvent as SubmitEvent;
+              const submitter = nativeEvent.submitter as HTMLButtonElement | null;
+              const status = submitter?.value === 'posted' ? 'posted' : 'draft';
+              await saveJournalEntry(status);
             }}
           >
+            {formError ? <div className="alert alert-danger">{formError}</div> : null}
+
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Institution">
                 <select
@@ -749,7 +857,7 @@ export function JournalEntriesPage() {
                 <CardTitle className="text-sm">Journal lines</CardTitle>
                 <Button
                   type="button"
-                  className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                  className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
                   onClick={() =>
                     setForm((current) => ({
                       ...current,
@@ -854,12 +962,14 @@ export function JournalEntriesPage() {
                     <div className="flex items-end">
                       <Button
                         type="button"
-                        className="w-full bg-red-50 text-red-700 hover:bg-red-100"
+                        className="btn-outline-danger w-full bg-red-50 text-red-700 hover:bg-red-100"
                         disabled={form.lines.length === 1}
                         onClick={() =>
                           setForm((current) => ({
                             ...current,
-                            lines: current.lines.filter((_, currentIndex) => currentIndex !== index),
+                            lines: current.lines.filter(
+                              (_, currentIndex) => currentIndex !== index,
+                            ),
                           }))
                         }
                       >
@@ -870,103 +980,9 @@ export function JournalEntriesPage() {
                 </div>
               ))}
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                disabled={isSaving}
-                onClick={async () => {
-                  setIsSaving(true);
-                  try {
-                    const payload = {
-                      institution: selectedInstitutionId || defaultInstitutionId,
-                      branch: selectedBranchId || null,
-                      reference: form.reference.trim(),
-                      description: form.description.trim(),
-                      entry_date: form.entry_date,
-                      status: 'draft',
-                      lines: form.lines.map((line) => ({
-                        account: line.account,
-                        description: line.description.trim(),
-                        debit: line.debit || '0.00',
-                        credit: line.credit || '0.00',
-                      })),
-                    };
-
-                    const savedEntry = editingEntryId
-                      ? await accountingApi.journalEntries.update(
-                          editingEntryId,
-                          payload,
-                        )
-                      : await accountingApi.journalEntries.create(payload);
-
-                    toast.success(
-                      editingEntryId ? 'Draft updated' : 'Draft saved',
-                    );
-                    setEditingEntryId(String(savedEntry.id));
-                    setForm(journalFormFromRecord(savedEntry));
-                    await reload();
-                  } catch (saveError) {
-                    toast.error(getProblemMessage(saveError));
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-              >
-                {isSaving ? 'Saving...' : 'Save draft'}
-              </Button>
-
-              <Button
-                type="button"
-                disabled={isSaving}
-                className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={async () => {
-                  setIsSaving(true);
-                  try {
-                    const payload = {
-                      institution: selectedInstitutionId || defaultInstitutionId,
-                      branch: selectedBranchId || null,
-                      reference: form.reference.trim(),
-                      description: form.description.trim(),
-                      entry_date: form.entry_date,
-                      status: 'posted',
-                      lines: form.lines.map((line) => ({
-                        account: line.account,
-                        description: line.description.trim(),
-                        debit: line.debit || '0.00',
-                        credit: line.credit || '0.00',
-                      })),
-                    };
-
-                    const savedEntry = editingEntryId
-                      ? await accountingApi.journalEntries.update(
-                          editingEntryId,
-                          payload,
-                        )
-                      : await accountingApi.journalEntries.create(payload);
-
-                    toast.success('Journal entry posted');
-                    setEditingEntryId(null);
-                    setForm(createEmptyJournalForm(defaultInstitutionId, fixedBranchId));
-                    await reload();
-                    if (savedEntry.institution) {
-                      await reloadAccounts();
-                    }
-                  } catch (saveError) {
-                    toast.error(
-                      getProblemMessage(saveError, 'Unable to post journal entry.'),
-                    );
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-              >
-                Post entry
-              </Button>
-            </div>
           </form>
-        </Card>
-      </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

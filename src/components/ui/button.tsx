@@ -8,7 +8,7 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center rounded-xl bg-[#127D61] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f6c54] disabled:cursor-not-allowed disabled:opacity-60',
+        'btn btn-primary inline-flex items-center justify-center rounded-xl bg-[#127D61] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#0f6c54] disabled:cursor-not-allowed disabled:opacity-60',
         className,
       )}
       {...props}

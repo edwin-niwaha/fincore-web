@@ -4,16 +4,27 @@ import type {
   AdminDashboardSummary,
   Branch,
   Client,
-  ClientProfile,
   ClientDashboardSummary,
+  ClientLinkableUser,
+  ClientProfile,
   Institution,
   JournalEntry,
   LedgerAccount,
   LoanApplication,
+  LoanProduct,
+  LoanPortfolioReport,
   LoanRepayment,
   LoginResponse,
+  Notification,
   PaginatedResponse,
+  RepaymentScheduleRow,
+  SavingsBalancesReport,
   SavingsAccount,
+  SavingsTransaction,
+  SelfServiceDashboardSummary,
+  SelfServiceLoanStatement,
+  SelfServiceSavingsStatement,
+  SelfServiceSavingsSummary,
   StaffDashboardSummary,
   TrialBalanceReport,
   Transaction,
@@ -65,14 +76,20 @@ type ClientWritePayload = {
   next_of_kin_phone?: string;
   status: string;
 };
-type ClientSelfServicePayload = {
+export type ClientSelfServicePayload = {
   phone?: string;
   email?: string;
-  date_of_birth?: string;
   address?: string;
-  occupation?: string;
-  next_of_kin_name?: string;
-  next_of_kin_phone?: string;
+  avatar?: File | null;
+};
+type SavingsAccountWritePayload = {
+  client: string | number;
+  status: string;
+};
+type SavingsOperationPayload = {
+  amount: string | number;
+  reference: string;
+  notes?: string;
 };
 type LedgerAccountWritePayload = {
   institution: string | number;
@@ -97,6 +114,43 @@ type JournalEntryWritePayload = {
   entry_date?: string;
   status?: string;
   lines: JournalEntryLinePayload[];
+};
+type LoanProductWritePayload = {
+  institution: string | number;
+  name: string;
+  code: string;
+  min_amount: string | number;
+  max_amount: string | number;
+  annual_interest_rate: string | number;
+  interest_method?: string;
+  repayment_frequency?: string;
+  min_term_months: number;
+  max_term_months: number;
+  default_term_months?: number | null;
+  penalty_rate?: string | number;
+  penalty_flat_amount?: string | number;
+  penalty_grace_days?: number;
+  is_active?: boolean;
+};
+type LoanApplicationWritePayload = {
+  client?: string | number;
+  product: string | number;
+  amount: string | number;
+  term_months: number;
+  purpose?: string;
+  submit?: boolean;
+};
+type LoanDecisionPayload = {
+  reason?: string;
+  comment?: string;
+  reference?: string;
+  disbursement_method?: string;
+  override?: boolean;
+};
+type LoanRepaymentWritePayload = {
+  amount: string | number;
+  reference: string;
+  payment_method?: string;
 };
 
 function withQuery(path: string, query?: Query) {
@@ -222,11 +276,30 @@ function createCrudResourceApi<T, TPayload extends Record<string, unknown>>(
   };
 }
 
+async function listAllPages<T>(path: string): Promise<T[]> {
+  const rows: T[] = [];
+  let nextPath: string | null = path;
+
+  while (nextPath) {
+    const page: ListResponse<T> = await apiClient.get<ListResponse<T>>(nextPath);
+
+    if (Array.isArray(page)) {
+      rows.push(...page);
+      break;
+    }
+
+    rows.push(...(page.results ?? []));
+    nextPath = page.next;
+  }
+
+  return rows;
+}
+
 export const resourcesApi = {
   clients: createResourceApi<Client>(endpoints.clients, endpoints.clientDetail),
   savingsAccounts: createResourceApi<SavingsAccount>(
     endpoints.savingsAccounts,
-    (id) => `/api/v1/savings/accounts/${id}/`,
+    endpoints.savingsAccountDetail,
   ),
   loanApplications: createResourceApi<LoanApplication>(
     endpoints.loanApplications,
@@ -239,6 +312,72 @@ export const resourcesApi = {
   transactions: createResourceApi<Transaction>(
     endpoints.transactions,
     (id) => `/api/v1/transactions/${id}/`,
+  ),
+};
+
+export const loanApi = {
+  products: createCrudResourceApi<LoanProduct, LoanProductWritePayload>(
+    endpoints.loanProducts,
+    endpoints.loanProductDetail,
+  ),
+  applications: {
+    ...createCrudResourceApi<LoanApplication, LoanApplicationWritePayload>(
+      endpoints.loanApplications,
+      endpoints.loanApplicationDetail,
+    ),
+    submit: (id: string | number, payload?: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(endpoints.loanApplicationSubmit(id), payload ?? {}),
+    startReview: (id: string | number, payload?: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(
+        endpoints.loanApplicationStartReview(id),
+        payload ?? {},
+      ),
+    recommend: (id: string | number, payload?: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(
+        endpoints.loanApplicationRecommend(id),
+        payload ?? {},
+      ),
+    approve: (id: string | number, payload?: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(endpoints.loanApplicationApprove(id), payload ?? {}),
+    reject: (id: string | number, payload?: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(endpoints.loanApplicationReject(id), payload ?? {}),
+    disburse: (id: string | number, payload: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(endpoints.loanApplicationDisburse(id), payload),
+    repay: (id: string | number, payload: LoanRepaymentWritePayload) =>
+      apiClient.post<LoanRepayment>(endpoints.loanApplicationRepay(id), payload),
+    schedule: (id: string | number) =>
+      apiClient.get<ListResponse<RepaymentScheduleRow>>(
+        endpoints.loanApplicationSchedule(id),
+      ),
+    repayments: (id: string | number, query?: Query) =>
+      apiClient.get<ListResponse<LoanRepayment>>(
+        withQuery(endpoints.loanApplicationRepayments(id), query),
+      ),
+  },
+  repayments: createResourceApi<LoanRepayment>(
+    endpoints.loanRepayments,
+    (id) => `/api/v1/loans/repayments/${id}/`,
+  ),
+};
+
+export const savingsApi = {
+  accounts: {
+    ...createCrudResourceApi<SavingsAccount, SavingsAccountWritePayload>(
+      endpoints.savingsAccounts,
+      endpoints.savingsAccountDetail,
+    ),
+    deposit: (id: string | number, payload: SavingsOperationPayload) =>
+      apiClient.post<SavingsTransaction>(endpoints.savingsAccountDeposit(id), payload),
+    withdraw: (id: string | number, payload: SavingsOperationPayload) =>
+      apiClient.post<SavingsTransaction>(endpoints.savingsAccountWithdraw(id), payload),
+    transactions: (id: string | number, query?: Query) =>
+      apiClient.get<ListResponse<SavingsTransaction>>(
+        withQuery(endpoints.savingsAccountTransactions(id), query),
+      ),
+  },
+  transactions: createResourceApi<SavingsTransaction>(
+    endpoints.savingsTransactions,
+    (id) => `/api/v1/savings/transactions/${id}/`,
   ),
 };
 
@@ -262,18 +401,118 @@ export const clientsApi = {
     endpoints.clients,
     endpoints.clientDetail,
   ),
+
+  listLinkableUsers: (query?: Query) =>
+    apiClient.get<ListResponse<ClientLinkableUser>>(
+      withQuery(endpoints.clientLinkableUsers, query),
+    ),
+
   getProfile: (id: string | number) =>
     apiClient.get<ClientProfile>(endpoints.clientDetail(id)),
+
   me: () => apiClient.get<ClientProfile>(endpoints.clientMe),
-  updateMe: (payload: ClientSelfServicePayload) =>
+
+  updateMe: (payload: ClientSelfServicePayload | FormData) =>
     apiClient.patch<ClientProfile>(endpoints.clientMe, payload),
 };
 
+export const notificationsApi = {
+  list: (query?: Query) =>
+    apiClient.get<ListResponse<Notification>>(withQuery(endpoints.notifications, query)),
+  markRead: (id: string | number) =>
+    apiClient.post<Notification>(endpoints.notificationMarkRead(id)),
+  markAllRead: () =>
+    apiClient.post<{ detail: string }>(endpoints.notificationsMarkAllRead),
+};
+
+export const selfServiceApi = {
+  dashboard: () =>
+    apiClient.get<SelfServiceDashboardSummary>(endpoints.selfService.dashboard),
+
+  profile: {
+    get: () => apiClient.get<ClientProfile>(endpoints.selfService.profile),
+    update: (payload: ClientSelfServicePayload | FormData) =>
+      apiClient.patch<ClientProfile>(endpoints.selfService.profile, payload),
+  },
+  savings: {
+    summary: () =>
+      apiClient.get<SelfServiceSavingsSummary>(endpoints.selfService.savingsSummary),
+    statement: (query?: Query) =>
+      apiClient.get<SelfServiceSavingsStatement>(
+        withQuery(endpoints.selfService.savingsStatement, query),
+      ),
+    list: (query?: Query) =>
+      apiClient.get<ListResponse<SavingsAccount>>(
+        withQuery(endpoints.selfService.savings, query),
+      ),
+    transactions: (query?: Query) =>
+      apiClient.get<ListResponse<SavingsTransaction>>(
+        withQuery(endpoints.selfService.savingsTransactions, query),
+      ),
+  },
+  loanProducts: {
+    list: (query?: Query) =>
+      apiClient.get<ListResponse<LoanProduct>>(
+        withQuery(endpoints.selfService.loanProducts, query),
+      ),
+  },
+  loanApplications: {
+    list: (query?: Query) =>
+      apiClient.get<ListResponse<LoanApplication>>(
+        withQuery(endpoints.selfService.loanApplications, query),
+      ),
+    create: (payload: LoanApplicationWritePayload) =>
+      apiClient.post<LoanApplication>(endpoints.selfService.loanApplications, payload),
+    get: (id: string | number) =>
+      apiClient.get<LoanApplication>(endpoints.selfService.loanApplicationDetail(id)),
+  },
+  loans: {
+    statement: (query?: Query) =>
+      apiClient.get<SelfServiceLoanStatement>(
+        withQuery(endpoints.selfService.loanStatement, query),
+      ),
+    list: (query?: Query) =>
+      apiClient.get<ListResponse<LoanApplication>>(
+        withQuery(endpoints.selfService.loans, query),
+      ),
+    get: (id: string | number) =>
+      apiClient.get<LoanApplication>(endpoints.selfService.loanDetail(id)),
+  },
+  repayments: {
+    list: (query?: Query) =>
+      apiClient.get<ListResponse<LoanRepayment>>(
+        withQuery(endpoints.selfService.repayments, query),
+      ),
+  },
+  transactions: {
+    list: (query?: Query) =>
+      apiClient.get<ListResponse<Transaction>>(
+        withQuery(endpoints.selfService.transactions, query),
+      ),
+  },
+  notifications: {
+    list: (query?: Query) =>
+      apiClient.get<ListResponse<Notification>>(
+        withQuery(endpoints.selfService.notifications, query),
+      ),
+    markRead: (id: string | number) =>
+      apiClient.post<Notification>(endpoints.selfService.notificationMarkRead(id)),
+    markAllRead: () =>
+      apiClient.post<{ detail: string; updated?: number }>(
+        endpoints.selfService.notificationsMarkAllRead,
+      ),
+  },
+};
+
 export const accountingApi = {
-  accounts: createCrudResourceApi<LedgerAccount, LedgerAccountWritePayload>(
-    endpoints.accountingAccounts,
-    endpoints.accountingAccountDetail,
-  ),
+  accounts: {
+    ...createCrudResourceApi<LedgerAccount, LedgerAccountWritePayload>(
+      endpoints.accountingAccounts,
+      endpoints.accountingAccountDetail,
+    ),
+    listAll: (query?: Query) =>
+      listAllPages<LedgerAccount>(withQuery(endpoints.accountingAccounts, query)),
+  },
   journalEntries: {
     ...createCrudResourceApi<JournalEntry, JournalEntryWritePayload>(
       endpoints.accountingJournalEntries,
@@ -281,6 +520,24 @@ export const accountingApi = {
     ),
     post: (id: string | number) =>
       apiClient.post<JournalEntry>(endpoints.accountingJournalEntryPost(id)),
+    listAll: (query?: Query) =>
+      listAllPages<JournalEntry>(
+        withQuery(endpoints.accountingJournalEntries, query),
+      ),
+  },
+  reports: {
+    savingsBalances: (query?: Query) =>
+      apiClient.get<SavingsBalancesReport>(
+        withQuery(endpoints.reports.savingsBalances, query),
+      ),
+    loanPortfolio: (query?: Query) =>
+      apiClient.get<LoanPortfolioReport>(
+        withQuery(endpoints.reports.loanPortfolio, query),
+      ),
+    trialBalance: (query?: Query) =>
+      apiClient.get<TrialBalanceReport>(
+        withQuery(endpoints.reports.trialBalance, query),
+      ),
   },
   trialBalance: (query?: Query) =>
     apiClient.get<TrialBalanceReport>(

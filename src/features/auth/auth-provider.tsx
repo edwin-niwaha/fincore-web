@@ -59,9 +59,7 @@ export function getFriendlyError(error: unknown) {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(() =>
-    Boolean(tokenStore.getAccess() || tokenStore.getRefresh()),
-  );
+  const [isLoading, setIsLoading] = useState(true);
 
   const reloadProfile = useCallback(async () => {
     setIsLoading(true);
@@ -121,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const profile = applyAuthResponse(await authApi.login(email, password));
       setUser(profile);
+      setIsLoading(false);
       toast.success('Welcome back');
       return profile;
     } catch (error) {
@@ -133,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const profile = applyAuthResponse(await authApi.register(payload));
       setUser(profile);
+      setIsLoading(false);
       toast.success('Account created. Check your email for the OTP code.');
       return profile;
     } catch (error) {
@@ -147,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await authApi.loginWithGoogle(accessToken),
       );
       setUser(profile);
+      setIsLoading(false);
       toast.success('Signed in with Google');
       return profile;
     } catch (error) {
@@ -160,6 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authApi.verifyEmail(code);
       const profile = normalizeUser(response.user);
       setUser(profile);
+      setIsLoading(false);
       toast.success(response.detail || 'Email verified successfully');
       return profile;
     } catch (error) {
@@ -187,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       tokenStore.clear();
       setUser(null);
+      setIsLoading(false);
       toast.success('Signed out');
     }
   }

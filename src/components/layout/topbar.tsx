@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Bell, Menu, Search, ShieldCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-provider';
@@ -13,6 +14,8 @@ export function Topbar({
 }) {
   const { user, logout } = useAuth();
   const role = String(user?.role ?? '').replaceAll('_', ' ');
+  const notificationsPath =
+    user?.role === 'client' ? '/self-service/notifications' : '/notifications';
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-xl sm:px-6 lg:px-8">
@@ -53,12 +56,13 @@ export function Topbar({
           <span className="hidden items-center gap-2 rounded-full bg-[#e8f5f1] px-3 py-2 text-xs font-black text-[#127D61] sm:inline-flex">
             <ShieldCheck className="h-4 w-4" /> Secure
           </span>
-          <button
+          <Link
+            href={notificationsPath}
             className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-600"
             aria-label="Notifications"
           >
             <Bell className="h-5 w-5" />
-          </button>
+          </Link>
           <Button
             onClick={() => void logout()}
             className="bg-[#127D61] text-white hover:bg-[#0f6b53]"

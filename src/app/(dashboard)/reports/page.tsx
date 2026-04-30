@@ -1,7 +1,7 @@
 'use client';
 
-import { TrialBalancePage } from '@/features/accounting/trial-balance-page';
+import { ReportsOverviewPage } from '@/features/accounting/reports-overview-page';
 
 export default function ReportsPage() {
-  return <TrialBalancePage />;
+  return <ReportsOverviewPage />;
 }

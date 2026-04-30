@@ -2,13 +2,17 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/layout/page-header';
+import { RecordsListPanel } from '@/components/records/records-list-panel';
+import { RecordsPageLayout } from '@/components/records/records-page-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
 import type { Column } from '@/components/ui/data-table';
 import { DataTable } from '@/components/ui/data-table';
 import { Field, Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
+import { RowActions } from '@/components/ui/row-actions';
 import { StateView } from '@/components/ui/state-view';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/features/auth/auth-provider';
 import {
   activityFilterOptions,
@@ -18,8 +22,8 @@ import {
   roleOptionsForActor,
   roleRequiresBranch,
   roleRequiresInstitution,
-  statusPillClassName,
 } from '@/features/admin/shared';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useApiResource } from '@/hooks/use-api-resource';
 import { unwrapList } from '@/lib/api/format';
 import { adminApi } from '@/lib/api/services';
@@ -137,7 +141,7 @@ function statusText(isActive?: boolean) {
 }
 
 function statusClassName(isActive?: boolean) {
-  return statusPillClassName(isActive ? 'active' : 'inactive');
+  return isActive ? 'active' : 'inactive';
 }
 
 export function UsersManagementPage() {
@@ -148,17 +152,20 @@ export function UsersManagementPage() {
   const fixedInstitutionId = user?.institution ? String(user.institution) : '';
   const fixedBranchId = user?.branch ? String(user.branch) : '';
 
+  const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [activeFilter, setActiveFilter] = useState('all');
   const [institutionFilter, setInstitutionFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTogglingUserId, setIsTogglingUserId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(() =>
     createEmptyUserForm(defaultRole, fixedInstitutionId, fixedBranchId),
   );
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
   const loadUsers = useCallback(
     () =>
@@ -202,6 +209,28 @@ export function UsersManagementPage() {
   } = useApiResource(loadBranches);
 
   const users = unwrapList(data);
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((candidate) => {
+        if (!debouncedSearch) return true;
+
+        return [
+          candidate.full_name,
+          candidate.username,
+          candidate.email,
+          candidate.phone,
+          candidate.role,
+          candidate.role_display,
+          candidate.institution_name,
+          candidate.branch_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(debouncedSearch.toLowerCase());
+      }),
+    [debouncedSearch, users],
+  );
   const loadedInstitutions = unwrapList(institutionsData);
   const loadedBranches = unwrapList(branchesData);
 
@@ -237,14 +266,15 @@ export function UsersManagementPage() {
     actorRole === 'super_admin' || actorRole === 'institution_admin';
   const canChooseBranch =
     actorRole === 'super_admin' || actorRole === 'institution_admin';
+  const formId = 'user-form';
 
-  const activeUsers = users.filter(
+  const activeUsers = filteredUsers.filter(
     (candidate) => candidate.is_active !== false,
   ).length;
-  const verifiedUsers = users.filter(
+  const verifiedUsers = filteredUsers.filter(
     (candidate) => candidate.is_email_verified,
   ).length;
-  const staffUsers = users.filter(
+  const staffUsers = filteredUsers.filter(
     (candidate) => candidate.role !== 'client',
   ).length;
 
@@ -258,6 +288,23 @@ export function UsersManagementPage() {
     setForm(
       createEmptyUserForm(defaultRole, defaultInstitutionId, defaultBranchId),
     );
+  }
+
+  function openCreateModal() {
+    resetForm();
+    setIsFormOpen(true);
+  }
+
+  function openEditModal(targetUser: User) {
+    setEditingUserId(String(targetUser.id));
+    setFormError(null);
+    setForm(userFormFromRecord(targetUser));
+    setIsFormOpen(true);
+  }
+
+  function closeFormModal() {
+    setIsFormOpen(false);
+    setFormError(null);
   }
 
   const columns: Column<User>[] = [
@@ -299,13 +346,10 @@ export function UsersManagementPage() {
     {
       header: 'Status',
       accessor: (row) => (
-        <span
-          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusClassName(
-            row.is_active,
-          )}`}
-        >
-          {statusText(row.is_active)}
-        </span>
+        <StatusBadge
+          status={statusClassName(row.is_active)}
+          label={statusText(row.is_active)}
+        />
       ),
     },
     {
@@ -316,56 +360,49 @@ export function UsersManagementPage() {
       header: 'Actions',
       accessor: (row) =>
         canEditRecord(row) ? (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-              onClick={() => {
-                setEditingUserId(String(row.id));
-                setFormError(null);
-                setForm(userFormFromRecord(row));
-              }}
-            >
-              Edit
-            </Button>
-            <Button
-              type="button"
-              className={
-                row.is_active === false
-                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                  : 'bg-red-50 text-red-700 hover:bg-red-100'
-              }
-              disabled={isTogglingUserId === String(row.id)}
-              onClick={async () => {
-                const nextIsActive = row.is_active === false;
-                setIsTogglingUserId(String(row.id));
+          <RowActions
+            actions={[
+              {
+                key: 'edit',
+                label: 'Edit',
+                onClick: () => openEditModal(row),
+              },
+              {
+                key: 'toggle',
+                label: row.is_active === false ? 'Activate' : 'Deactivate',
+                tone: row.is_active === false ? 'success' : 'danger',
+                disabled: isTogglingUserId === String(row.id),
+                onClick: async () => {
+                  const nextIsActive = row.is_active === false;
+                  setIsTogglingUserId(String(row.id));
 
-                try {
-                  await adminApi.users.update(row.id, {
-                    is_active: nextIsActive,
-                  });
-                  toast.success(
-                    nextIsActive ? 'User activated' : 'User deactivated',
-                  );
-                  await reload();
-                } catch (toggleError) {
-                  toast.error(
-                    getProblemMessage(
-                      toggleError,
-                      'Unable to update user status.',
-                    ),
-                  );
-                } finally {
-                  setIsTogglingUserId(null);
-                }
-              }}
-            >
-              {row.is_active === false ? 'Activate' : 'Deactivate'}
-            </Button>
-          </div>
+                  try {
+                    await adminApi.users.update(row.id, {
+                      is_active: nextIsActive,
+                    });
+                    toast.success(
+                      nextIsActive ? 'User activated' : 'User deactivated',
+                    );
+                    await reload();
+                  } catch (toggleError) {
+                    toast.error(
+                      getProblemMessage(
+                        toggleError,
+                        'Unable to update user status.',
+                      ),
+                    );
+                  } finally {
+                    setIsTogglingUserId(null);
+                  }
+                },
+              },
+            ]}
+            align="end"
+          />
         ) : (
           <span className="text-xs font-semibold text-slate-400">Self</span>
         ),
+      align: 'right',
     },
   ];
 
@@ -429,46 +466,40 @@ export function UsersManagementPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="Users and roles"
-        description="Manage staff and client accounts within your allowed institution and branch scope."
-      />
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">Users in scope</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {users.length}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">Active users</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {activeUsers}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">
-            Verified and staff
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {verifiedUsers} / {staffUsers}
-          </p>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
+    <RecordsPageLayout
+      title="Users and roles"
+      description="Manage staff and client accounts within your allowed institution and branch scope."
+      metrics={[
+        {
+          label: 'Users in scope',
+          value: filteredUsers.length,
+          hint: 'Matching the current filters and search.',
+          accent: 'slate',
+        },
+        {
+          label: 'Active users',
+          value: activeUsers,
+          hint: 'Currently enabled in this view.',
+        },
+        {
+          label: 'Verified and staff',
+          value: `${verifiedUsers} / ${staffUsers}`,
+          hint: 'Verified accounts compared with non-client users.',
+          accent: 'amber',
+        },
+      ]}
+      filterPanel={
         <Card className="grid gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>User directory</CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
-                Super admins manage everything, institution admins manage their
-                institution, and branch managers manage only their branch teams.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
+          <CardTitle>Search and filters</CardTitle>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <Field label="Search">
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Name, email, username, role, or branch"
+              />
+            </Field>
+            <Field label="Role">
               <select
                 className={formSelectClassName}
                 value={roleFilter}
@@ -481,6 +512,8 @@ export function UsersManagementPage() {
                   </option>
                 ))}
               </select>
+            </Field>
+            <Field label="Status">
               <select
                 className={formSelectClassName}
                 value={activeFilter}
@@ -492,7 +525,9 @@ export function UsersManagementPage() {
                   </option>
                 ))}
               </select>
-              {canChooseInstitution && institutions.length > 1 ? (
+            </Field>
+            {canChooseInstitution && institutions.length > 1 ? (
+              <Field label="Institution">
                 <select
                   className={formSelectClassName}
                   value={institutionFilter}
@@ -508,8 +543,10 @@ export function UsersManagementPage() {
                     </option>
                   ))}
                 </select>
-              ) : null}
-              {branches.length > 1 ? (
+              </Field>
+            ) : null}
+            {branches.length > 1 ? (
+              <Field label="Branch">
                 <select
                   className={formSelectClassName}
                   value={branchFilter}
@@ -518,10 +555,7 @@ export function UsersManagementPage() {
                   <option value="all">All branches</option>
                   {branches
                     .filter((branch) => {
-                      if (
-                        institutionFilter === 'all' ||
-                        !canChooseInstitution
-                      ) {
+                      if (institutionFilter === 'all' || !canChooseInstitution) {
                         return true;
                       }
                       return branchInstitutionId(branch) === institutionFilter;
@@ -532,44 +566,87 @@ export function UsersManagementPage() {
                       </option>
                     ))}
                 </select>
-              ) : null}
-              <Button type="button" onClick={resetForm}>
-                New user
-              </Button>
-            </div>
+              </Field>
+            ) : null}
           </div>
-
-          <DataTable
-            data={users}
-            columns={columns}
-            emptyMessage="No users matched this filter."
-          />
         </Card>
+      }
+    >
+      <div className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
+        <RecordsListPanel
+          title="User directory"
+          description="Super admins manage everything, institution admins manage their institution, and branch managers manage only their branch teams."
+          action={
+            <Button type="button" onClick={openCreateModal}>
+              New user
+            </Button>
+          }
+        >
+          <div className="p-5">
+            <DataTable
+              data={filteredUsers}
+              columns={columns}
+              emptyTitle="No users found"
+              emptyMessage="Try widening the current search or account filters."
+            />
+          </div>
+        </RecordsListPanel>
+      </div>
 
-        <Card>
-          <CardTitle>{editingUserId ? 'Edit user' : 'Create user'}</CardTitle>
-          <p className="mt-2 text-sm text-slate-500">
-            {editingUserId
+      {isFormOpen ? (
+        <Modal
+          open={isFormOpen}
+          onClose={closeFormModal}
+          size="xl"
+          title={editingUserId ? 'Edit user' : 'Create user'}
+          description={
+            editingUserId
               ? 'Update account details, role assignment, or activation status.'
-              : 'Create a staff or client account within your management scope.'}
-          </p>
-
-          {formError ? (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {formError}
-            </div>
-          ) : null}
-
+              : 'Create a staff or client account within your management scope.'
+          }
+          footer={
+            <>
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={() => {
+                  if (selectedUser) {
+                    setFormError(null);
+                    setForm(userFormFromRecord(selectedUser));
+                    return;
+                  }
+                  resetForm();
+                }}
+              >
+                {selectedUser ? 'Reset form' : 'Clear form'}
+              </Button>
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={closeFormModal}
+              >
+                Cancel
+              </Button>
+              <Button form={formId} type="submit" disabled={isSaving}>
+                {isSaving
+                  ? 'Saving...'
+                  : editingUserId
+                    ? 'Save changes'
+                    : 'Create user'}
+              </Button>
+            </>
+          }
+        >
           <form
-            className="mt-4 grid gap-4"
+            id={formId}
+            className="grid gap-4"
             onSubmit={async (event) => {
               event.preventDefault();
               setIsSaving(true);
               setFormError(null);
 
               const chosenBranch = availableBranches.find(
-                (branch) =>
-                  String(branch.id) === (form.branch || defaultBranchId),
+                (branch) => String(branch.id) === (form.branch || defaultBranchId),
               );
               const chosenInstitutionId =
                 form.institution ||
@@ -590,8 +667,7 @@ export function UsersManagementPage() {
                   ? chosenInstitutionId || null
                   : null,
                 branch:
-                  form.role === 'super_admin' ||
-                  form.role === 'institution_admin'
+                  form.role === 'super_admin' || form.role === 'institution_admin'
                     ? null
                     : chosenBranchId || null,
                 is_active: form.is_active,
@@ -599,13 +675,13 @@ export function UsersManagementPage() {
               };
 
               try {
-                const savedUser = editingUserId
-                  ? await adminApi.users.update(editingUserId, payload)
-                  : await adminApi.users.create(payload);
+                await (editingUserId
+                  ? adminApi.users.update(editingUserId, payload)
+                  : adminApi.users.create(payload));
 
                 toast.success(editingUserId ? 'User updated' : 'User created');
-                setEditingUserId(String(savedUser.id));
-                setForm(userFormFromRecord(savedUser));
+                closeFormModal();
+                resetForm();
                 await reload();
               } catch (saveError) {
                 const message = getProblemMessage(saveError);
@@ -616,6 +692,8 @@ export function UsersManagementPage() {
               }
             }}
           >
+            {formError ? <div className="alert alert-danger">{formError}</div> : null}
+
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Email address">
                 <Input
@@ -735,9 +813,7 @@ export function UsersManagementPage() {
                       const nextInstitutionId = event.target.value;
                       const nextBranches = branches.filter((branch) => {
                         if (!nextInstitutionId) return true;
-                        return (
-                          branchInstitutionId(branch) === nextInstitutionId
-                        );
+                        return branchInstitutionId(branch) === nextInstitutionId;
                       });
 
                       return {
@@ -768,9 +844,7 @@ export function UsersManagementPage() {
 
             {form.role !== 'institution_admin' ? (
               <Field
-                label={
-                  roleRequiresBranch(form.role) ? 'Branch' : 'Branch (optional)'
-                }
+                label={roleRequiresBranch(form.role) ? 'Branch' : 'Branch (optional)'}
               >
                 <select
                   className={formSelectClassName}
@@ -798,9 +872,7 @@ export function UsersManagementPage() {
             ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                label={editingUserId ? 'New password (optional)' : 'Password'}
-              >
+              <Field label={editingUserId ? 'New password (optional)' : 'Password'}>
                 <Input
                   value={form.password}
                   onChange={(event) =>
@@ -835,33 +907,9 @@ export function UsersManagementPage() {
                 </select>
               </Field>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving
-                  ? 'Saving...'
-                  : editingUserId
-                    ? 'Save changes'
-                    : 'Create user'}
-              </Button>
-              <Button
-                type="button"
-                className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                onClick={() => {
-                  if (selectedUser) {
-                    setFormError(null);
-                    setForm(userFormFromRecord(selectedUser));
-                    return;
-                  }
-                  resetForm();
-                }}
-              >
-                {selectedUser ? 'Reset form' : 'Clear form'}
-              </Button>
-            </div>
           </form>
-        </Card>
-      </div>
-    </div>
+        </Modal>
+      ) : null}
+    </RecordsPageLayout>
   );
 }

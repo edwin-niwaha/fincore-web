@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
+  Bell,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -31,14 +32,27 @@ const iconMap: Record<string, LucideIcon> = {
   '/admin': ShieldCheck,
   '/staff': LayoutDashboard,
   '/client': Home,
+  '/self-service': Home,
+  '/self-service/profile': Users,
+  '/self-service/savings': WalletCards,
+  '/self-service/loan-applications': ClipboardList,
+  '/self-service/loans': Building2,
+  '/self-service/repayments': ListChecks,
+  '/self-service/transactions': ReceiptText,
+  '/self-service/notifications': Bell,
   '/clients': Users,
   '/institutions': Landmark,
   '/branches': Building2,
   '/savings': WalletCards,
   '/loans/applications': ClipboardList,
   '/loans/repayments': ListChecks,
+  '/notifications': Bell,
   '/transactions': ReceiptText,
   '/reports': BarChart3,
+  '/reports/trial-balance': BarChart3,
+  '/reports/general-ledger': BarChart3,
+  '/reports/cashflow-statement': BarChart3,
+  '/reports/balance-sheet': BarChart3,
   '/users': Users,
   '/audit-logs': FileText,
   '/settings': Settings,
@@ -58,7 +72,7 @@ export function Sidebar({
   const visibleItems = navItems.filter((item) => {
     if (!item.roles) return true;
     if (!role) return false;
-    return item.roles.includes(role);
+    return item.roles.includes(role) && item.showInNavigation !== false;
   });
 
   return (

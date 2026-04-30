@@ -8,6 +8,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import type { Column } from '@/components/ui/data-table';
 import { DataTable } from '@/components/ui/data-table';
 import { Field, Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 import { StateView } from '@/components/ui/state-view';
 import {
   formSelectClassName,
@@ -97,6 +98,8 @@ export function ChartOfAccountsPage() {
     canChooseInstitution ? 'all' : fixedInstitutionId || 'all',
   );
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingAccountId, setDeletingAccountId] = useState<string | null>(
     null,
@@ -151,6 +154,26 @@ export function ChartOfAccountsPage() {
   const activeAccounts = accounts.filter((account) => account.is_active !== false).length;
   const systemAccounts = accounts.filter((account) => account.is_system).length;
   const manualAccounts = accounts.filter((account) => !account.is_system).length;
+  const formId = 'ledger-account-form';
+
+  function openCreateModal() {
+    setEditingAccountId(null);
+    setFormError(null);
+    setForm(createEmptyAccountForm(defaultInstitutionId));
+    setIsFormOpen(true);
+  }
+
+  function openEditModal(account: LedgerAccount) {
+    setEditingAccountId(String(account.id));
+    setFormError(null);
+    setForm(accountFormFromRecord(account));
+    setIsFormOpen(true);
+  }
+
+  function closeFormModal() {
+    setIsFormOpen(false);
+    setFormError(null);
+  }
 
   const columns: Column<LedgerAccount>[] = useMemo(
     () => [
@@ -213,17 +236,14 @@ export function ChartOfAccountsPage() {
               <>
                 <Button
                   type="button"
-                  className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                  onClick={() => {
-                    setEditingAccountId(String(account.id));
-                    setForm(accountFormFromRecord(account));
-                  }}
+                  className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                  onClick={() => openEditModal(account)}
                 >
                   Edit
                 </Button>
                 <Button
                   type="button"
-                  className="bg-red-50 text-red-700 hover:bg-red-100"
+                  className="btn-outline-danger bg-red-50 text-red-700 hover:bg-red-100"
                   disabled={deletingAccountId === String(account.id)}
                   onClick={async () => {
                     if (
@@ -241,6 +261,7 @@ export function ChartOfAccountsPage() {
                       if (editingAccountId === String(account.id)) {
                         setEditingAccountId(null);
                         setForm(createEmptyAccountForm(defaultInstitutionId));
+                        setIsFormOpen(false);
                       }
                       await reload();
                     } catch (deleteError) {
@@ -342,6 +363,9 @@ export function ChartOfAccountsPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={openCreateModal}>
+                New account
+              </Button>
               {canChooseInstitution ? (
                 <select
                   className={formSelectClassName}
@@ -388,18 +412,56 @@ export function ChartOfAccountsPage() {
             emptyMessage="No ledger accounts matched this filter."
           />
         </Card>
+      </div>
 
-        <Card>
-          <CardTitle>{editingAccountId ? 'Edit account' : 'Create account'}</CardTitle>
-          <p className="mt-2 text-sm text-slate-500">
-            Add manual accounts to extend the system chart for operational or reporting needs.
-          </p>
-
+      {isFormOpen ? (
+        <Modal
+          open={isFormOpen}
+          onClose={closeFormModal}
+          size="lg"
+          title={editingAccountId ? 'Edit account' : 'Create account'}
+          description="Add manual accounts to extend the system chart for operational or reporting needs."
+          footer={
+            <>
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={() => {
+                  if (selectedAccount) {
+                    setFormError(null);
+                    setForm(accountFormFromRecord(selectedAccount));
+                    return;
+                  }
+                  setFormError(null);
+                  setForm(createEmptyAccountForm(defaultInstitutionId));
+                }}
+              >
+                {selectedAccount ? 'Reset form' : 'Clear form'}
+              </Button>
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={closeFormModal}
+              >
+                Cancel
+              </Button>
+              <Button form={formId} type="submit" disabled={isSaving}>
+                {isSaving
+                  ? 'Saving...'
+                  : editingAccountId
+                    ? 'Save changes'
+                    : 'Create account'}
+              </Button>
+            </>
+          }
+        >
           <form
-            className="mt-4 grid gap-4"
+            id={formId}
+            className="grid gap-4"
             onSubmit={async (event) => {
               event.preventDefault();
               setIsSaving(true);
+              setFormError(null);
 
               try {
                 const payload = {
@@ -412,18 +474,23 @@ export function ChartOfAccountsPage() {
                   allow_manual_entries: form.allow_manual_entries,
                 };
 
-                const savedAccount = editingAccountId
-                  ? await accountingApi.accounts.update(editingAccountId, payload)
-                  : await accountingApi.accounts.create(payload);
+                await (editingAccountId
+                  ? accountingApi.accounts.update(editingAccountId, payload)
+                  : accountingApi.accounts.create(payload));
 
                 toast.success(
-                  editingAccountId ? 'Ledger account updated' : 'Ledger account created',
+                  editingAccountId
+                    ? 'Ledger account updated'
+                    : 'Ledger account created',
                 );
-                setEditingAccountId(String(savedAccount.id));
-                setForm(accountFormFromRecord(savedAccount));
+                closeFormModal();
+                setEditingAccountId(null);
+                setForm(createEmptyAccountForm(defaultInstitutionId));
                 await reload();
               } catch (saveError) {
-                toast.error(getProblemMessage(saveError));
+                const message = getProblemMessage(saveError);
+                setFormError(message);
+                toast.error(message);
               } finally {
                 setIsSaving(false);
               }
@@ -537,32 +604,10 @@ export function ChartOfAccountsPage() {
               </Field>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving
-                  ? 'Saving...'
-                  : editingAccountId
-                    ? 'Save changes'
-                    : 'Create account'}
-              </Button>
-              <Button
-                type="button"
-                className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                onClick={() => {
-                  if (selectedAccount) {
-                    setForm(accountFormFromRecord(selectedAccount));
-                    return;
-                  }
-                  setEditingAccountId(null);
-                  setForm(createEmptyAccountForm(defaultInstitutionId));
-                }}
-              >
-                {selectedAccount ? 'Reset form' : 'Clear form'}
-              </Button>
-            </div>
+            {formError ? <div className="alert alert-danger">{formError}</div> : null}
           </form>
-        </Card>
-      </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

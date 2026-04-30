@@ -1,9 +1,8 @@
 import type { Role } from '@/types/roles';
 
 export function dashboardPathForRole(role: Role | string) {
-  if (role === 'super_admin' || role === 'institution_admin') return '/admin';
-  if (role === 'client') return '/client';
-  return '/staff';
+  if (role === 'client') return '/self-service';
+  return '/dashboard';
 }
 
 export function canAccessDashboard(

@@ -56,7 +56,9 @@ function MobileDashboardNav({ onNavigate }: { onNavigate: () => void }) {
     <nav className="grid gap-2">
       {navItems
         .filter(
-          (item) => !item.roles || (role ? item.roles.includes(role) : false),
+          (item) =>
+            item.showInNavigation !== false &&
+            (!item.roles || (role ? item.roles.includes(role) : false)),
         )
         .map((item) => {
           const active =

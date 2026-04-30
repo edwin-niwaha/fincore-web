@@ -25,7 +25,7 @@ export const userRoleOptions: Array<{ value: Role; label: string }> = [
 ];
 
 export const formSelectClassName =
-  'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-950 shadow-sm outline-none transition focus:border-[#127D61] focus:ring-4 focus:ring-emerald-100';
+  'form-select w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-950 shadow-sm outline-none transition focus:border-[#127D61] focus:ring-4 focus:ring-emerald-100';
 
 export function statusLabel(status?: string) {
   if (!status) return 'Unknown';
@@ -38,19 +38,38 @@ export function statusPillClassName(status?: string) {
   if (status === 'active') {
     return 'bg-emerald-100 text-emerald-800';
   }
+  if (['approved', 'paid', 'posted', 'completed', 'open'].includes(status ?? '')) {
+    return 'bg-emerald-100 text-emerald-800';
+  }
   if (status === 'inactive') {
     return 'bg-slate-200 text-slate-700';
+  }
+  if (['draft', 'new', 'processing'].includes(status ?? '')) {
+    return 'bg-sky-100 text-sky-800';
   }
   if (status === 'pending') {
     return 'bg-amber-100 text-amber-800';
   }
+  if (
+    ['submitted', 'review', 'under_review', 'partially_paid'].includes(
+      status ?? '',
+    )
+  ) {
+    return 'bg-amber-100 text-amber-800';
+  }
+  if (['recommended', 'disbursed'].includes(status ?? '')) {
+    return 'bg-teal-100 text-teal-800';
+  }
   if (status === 'closed') {
+    return 'bg-rose-100 text-rose-800';
+  }
+  if (['rejected', 'failed', 'reversed', 'overdue', 'cancelled'].includes(status ?? '')) {
     return 'bg-rose-100 text-rose-800';
   }
   return 'bg-slate-100 text-slate-700';
 }
 
-export function formatDate(value?: string) {
+export function formatDate(value?: string | null) {
   if (!value) return '-';
 
   try {

@@ -1,22 +1,25 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { PageHeader } from '@/components/layout/page-header';
+import { RecordsListPanel } from '@/components/records/records-list-panel';
+import { RecordsPageLayout } from '@/components/records/records-page-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
 import type { Column } from '@/components/ui/data-table';
 import { DataTable } from '@/components/ui/data-table';
 import { Field, Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
+import { RowActions } from '@/components/ui/row-actions';
 import { StateView } from '@/components/ui/state-view';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { useAuth } from '@/features/auth/auth-provider';
 import {
   formSelectClassName,
   formatDate,
   organizationStatusOptions,
-  statusLabel,
-  statusPillClassName,
 } from '@/features/admin/shared';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useApiResource } from '@/hooks/use-api-resource';
 import { adminApi } from '@/lib/api/services';
 import { unwrapList } from '@/lib/api/format';
@@ -64,15 +67,19 @@ export function InstitutionsManagementPage() {
   const canCreateInstitutions = user?.role === 'super_admin';
   const canDeleteInstitutions = user?.role === 'super_admin';
 
+  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [editingInstitutionId, setEditingInstitutionId] = useState<
     string | null
   >(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<InstitutionFormState>(emptyInstitutionForm);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingInstitutionId, setDeletingInstitutionId] = useState<
     string | null
   >(null);
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
   const loadInstitutions = useCallback(
     () =>
@@ -85,10 +92,30 @@ export function InstitutionsManagementPage() {
   const { data, error, isLoading, reload } = useApiResource(loadInstitutions);
 
   const institutions = unwrapList(data);
-  const activeInstitutions = institutions.filter(
+  const filteredInstitutions = useMemo(
+    () =>
+      institutions.filter((institution) => {
+        if (!debouncedSearch) return true;
+
+        return [
+          institution.name,
+          institution.code,
+          institution.email,
+          institution.phone,
+          institution.currency,
+          institution.status,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(debouncedSearch.toLowerCase());
+      }),
+    [debouncedSearch, institutions],
+  );
+  const activeInstitutions = filteredInstitutions.filter(
     (institution) => institution.status === 'active',
   ).length;
-  const totalActiveBranches = institutions.reduce(
+  const totalActiveBranches = filteredInstitutions.reduce(
     (sum, institution) => sum + Number(institution.active_branch_count ?? 0),
     0,
   );
@@ -97,6 +124,26 @@ export function InstitutionsManagementPage() {
     institutions.find(
       (institution) => String(institution.id) === editingInstitutionId,
     ) ?? null;
+  const formId = 'institution-form';
+
+  function openCreateModal() {
+    setEditingInstitutionId(null);
+    setFormError(null);
+    setForm(emptyInstitutionForm);
+    setIsFormOpen(true);
+  }
+
+  function openEditModal(institution: Institution) {
+    setEditingInstitutionId(String(institution.id));
+    setFormError(null);
+    setForm(institutionFormFromRecord(institution));
+    setIsFormOpen(true);
+  }
+
+  function closeFormModal() {
+    setIsFormOpen(false);
+    setFormError(null);
+  }
 
   const columns: Column<Institution>[] = [
     {
@@ -121,15 +168,7 @@ export function InstitutionsManagementPage() {
     },
     {
       header: 'Status',
-      accessor: (institution) => (
-        <span
-          className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusPillClassName(
-            institution.status,
-          )}`}
-        >
-          {statusLabel(institution.status)}
-        </span>
-      ),
+      accessor: (institution) => <StatusBadge status={institution.status} />,
     },
     {
       header: 'Branches',
@@ -151,23 +190,20 @@ export function InstitutionsManagementPage() {
     {
       header: 'Actions',
       accessor: (institution) => (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-            onClick={() => {
-              setEditingInstitutionId(String(institution.id));
-              setForm(institutionFormFromRecord(institution));
-            }}
-          >
-            Edit
-          </Button>
-          {canDeleteInstitutions ? (
-            <Button
-              type="button"
-              className="bg-red-50 text-red-700 hover:bg-red-100"
-              disabled={deletingInstitutionId === String(institution.id)}
-              onClick={async () => {
+        <RowActions
+          actions={[
+            {
+              key: 'edit',
+              label: 'Edit',
+              onClick: () => openEditModal(institution),
+            },
+            {
+              key: 'delete',
+              label: 'Delete',
+              hidden: !canDeleteInstitutions,
+              disabled: deletingInstitutionId === String(institution.id),
+              tone: 'danger',
+              onClick: async () => {
                 if (
                   !window.confirm(
                     `Delete ${institution.name}? This cannot be undone.`,
@@ -184,6 +220,7 @@ export function InstitutionsManagementPage() {
                   if (editingInstitutionId === String(institution.id)) {
                     setEditingInstitutionId(null);
                     setForm(emptyInstitutionForm);
+                    setIsFormOpen(false);
                   }
                   await reload();
                 } catch (deleteError) {
@@ -191,13 +228,13 @@ export function InstitutionsManagementPage() {
                 } finally {
                   setDeletingInstitutionId(null);
                 }
-              }}
-            >
-              Delete
-            </Button>
-          ) : null}
-        </div>
+              },
+            },
+          ]}
+          align="end"
+        />
       ),
+      align: 'right',
     },
   ];
 
@@ -217,51 +254,40 @@ export function InstitutionsManagementPage() {
   }
 
   return (
-    <div className="grid gap-6">
-      <PageHeader
-        title="Institutions"
-        description="Manage institution setup, status, contact details, and branch visibility."
-      />
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">
-            Institutions in scope
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {institutions.length}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">
-            Active institutions
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {activeInstitutions}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm font-semibold text-slate-500">
-            Active branches
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {totalActiveBranches}
-          </p>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+    <RecordsPageLayout
+      title="Institutions"
+      description="Manage institution setup, status, contact details, and branch visibility."
+      metrics={[
+        {
+          label: 'Institutions in scope',
+          value: filteredInstitutions.length,
+          hint: 'Matching the current filters and search.',
+          accent: 'slate',
+        },
+        {
+          label: 'Active institutions',
+          value: activeInstitutions,
+          hint: 'Currently marked active in this view.',
+        },
+        {
+          label: 'Active branches',
+          value: totalActiveBranches,
+          hint: 'Summed branch activity across the visible institutions.',
+          accent: 'amber',
+        },
+      ]}
+      filterPanel={
         <Card className="grid gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Institution directory</CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
-                {canCreateInstitutions
-                  ? 'Super admins can create, update, and delete institutions.'
-                  : 'Institution admins can review and update only their own institution.'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
+          <CardTitle>Search and filters</CardTitle>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Field label="Search">
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Institution name, code, contact, or currency"
+              />
+            </Field>
+            <Field label="Status">
               <select
                 className={formSelectClassName}
                 value={statusFilter}
@@ -273,206 +299,227 @@ export function InstitutionsManagementPage() {
                   </option>
                 ))}
               </select>
-              {canCreateInstitutions ? (
-                <Button
-                  type="button"
-                  className="whitespace-nowrap"
-                  onClick={() => {
-                    setEditingInstitutionId(null);
-                    setForm(emptyInstitutionForm);
-                  }}
-                >
-                  New institution
-                </Button>
-              ) : null}
-            </div>
+            </Field>
           </div>
-
-          <DataTable
-            data={institutions}
-            columns={columns}
-            emptyMessage="No institutions matched this filter."
-          />
         </Card>
+      }
+    >
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+        <RecordsListPanel
+          title="Institution directory"
+          description={
+            canCreateInstitutions
+              ? 'Super admins can create, update, and delete institutions.'
+              : 'Institution admins can review and update only their own institution.'
+          }
+          action={
+            canCreateInstitutions ? (
+              <Button type="button" className="whitespace-nowrap" onClick={openCreateModal}>
+                New institution
+              </Button>
+            ) : undefined
+          }
+        >
+          <div className="p-5">
+            <DataTable
+              data={filteredInstitutions}
+              columns={columns}
+              emptyTitle="No institutions found"
+              emptyMessage="Try widening the current search or status filter."
+            />
+          </div>
+        </RecordsListPanel>
+      </div>
 
-        <Card>
-          <CardTitle>
-            {editingInstitutionId
+      {isFormOpen ? (
+        <Modal
+          open={isFormOpen}
+          onClose={closeFormModal}
+          size="lg"
+          title={
+            editingInstitutionId
               ? 'Edit institution'
               : canCreateInstitutions
                 ? 'Create institution'
-                : 'Institution details'}
-          </CardTitle>
-          <p className="mt-2 text-sm text-slate-500">
-            {editingInstitutionId
+                : 'Institution details'
+          }
+          description={
+            editingInstitutionId
               ? 'Update the selected institution and save your changes.'
-              : canCreateInstitutions
-                ? 'Add a new institution profile for onboarding and branch setup.'
-                : 'Select your institution from the table to edit its details.'}
-          </p>
+              : 'Add a new institution profile for onboarding and branch setup.'
+          }
+          footer={
+            <>
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={() => {
+                  if (selectedInstitution) {
+                    setFormError(null);
+                    setForm(institutionFormFromRecord(selectedInstitution));
+                    return;
+                  }
+                  setFormError(null);
+                  setForm(emptyInstitutionForm);
+                }}
+              >
+                {selectedInstitution ? 'Reset form' : 'Clear form'}
+              </Button>
+              <Button
+                type="button"
+                className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                onClick={closeFormModal}
+              >
+                Cancel
+              </Button>
+              <Button form={formId} type="submit" disabled={isSaving}>
+                {isSaving
+                  ? 'Saving...'
+                  : editingInstitutionId
+                    ? 'Save changes'
+                    : 'Create institution'}
+              </Button>
+            </>
+          }
+        >
+          <form
+            id={formId}
+            className="grid gap-4"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setIsSaving(true);
+              setFormError(null);
 
-          {!canCreateInstitutions && !editingInstitutionId ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-              Your role is scoped to updating an existing institution record.
-            </div>
-          ) : (
-            <form
-              className="mt-4 grid gap-4"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                setIsSaving(true);
+              try {
+                const payload = {
+                  name: form.name.trim(),
+                  code: form.code.trim(),
+                  email: form.email.trim(),
+                  phone: form.phone.trim(),
+                  currency: form.currency.trim() || 'UGX',
+                  status: form.status,
+                };
 
-                try {
-                  const payload = {
-                    name: form.name.trim(),
-                    code: form.code.trim(),
-                    email: form.email.trim(),
-                    phone: form.phone.trim(),
-                    currency: form.currency.trim() || 'UGX',
-                    status: form.status,
-                  };
+                await (editingInstitutionId
+                  ? adminApi.institutions.update(editingInstitutionId, payload)
+                  : adminApi.institutions.create(payload));
 
-                  const savedInstitution = editingInstitutionId
-                    ? await adminApi.institutions.update(
-                        editingInstitutionId,
-                        payload,
-                      )
-                    : await adminApi.institutions.create(payload);
-
-                  toast.success(
-                    editingInstitutionId
-                      ? 'Institution updated'
-                      : 'Institution created',
-                  );
-                  setEditingInstitutionId(String(savedInstitution.id));
-                  setForm(institutionFormFromRecord(savedInstitution));
-                  await reload();
-                } catch (saveError) {
-                  toast.error(getErrorMessage(saveError));
-                } finally {
-                  setIsSaving(false);
+                toast.success(
+                  editingInstitutionId
+                    ? 'Institution updated'
+                    : 'Institution created',
+                );
+                closeFormModal();
+                setEditingInstitutionId(null);
+                setForm(emptyInstitutionForm);
+                await reload();
+              } catch (saveError) {
+                const message = getErrorMessage(saveError);
+                setFormError(message);
+                toast.error(message);
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          >
+            <Field label="Institution name">
+              <Input
+                value={form.name}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
                 }
-              }}
-            >
-              <Field label="Institution name">
+                placeholder="FinCore SACCO"
+                required
+              />
+            </Field>
+
+            <Field label="Code">
+              <Input
+                value={form.code}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    code: event.target.value,
+                  }))
+                }
+                placeholder="fincore-sacco"
+                required
+              />
+            </Field>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Email">
                 <Input
-                  value={form.name}
+                  value={form.email}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
-                      name: event.target.value,
+                      email: event.target.value,
                     }))
                   }
-                  placeholder="FinCore SACCO"
-                  required
+                  placeholder="ops@example.com"
+                  type="email"
                 />
               </Field>
-
-              <Field label="Code">
+              <Field label="Phone">
                 <Input
-                  value={form.code}
+                  value={form.phone}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
-                      code: event.target.value,
+                      phone: event.target.value,
                     }))
                   }
-                  placeholder="fincore-sacco"
+                  placeholder="0700000000"
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Currency">
+                <Input
+                  value={form.currency}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      currency: event.target.value,
+                    }))
+                  }
+                  placeholder="UGX"
                   required
                 />
               </Field>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Email">
-                  <Input
-                    value={form.email}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        email: event.target.value,
-                      }))
-                    }
-                    placeholder="ops@example.com"
-                    type="email"
-                  />
-                </Field>
-                <Field label="Phone">
-                  <Input
-                    value={form.phone}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        phone: event.target.value,
-                      }))
-                    }
-                    placeholder="0700000000"
-                  />
-                </Field>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Currency">
-                  <Input
-                    value={form.currency}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        currency: event.target.value,
-                      }))
-                    }
-                    placeholder="UGX"
-                    required
-                  />
-                </Field>
-                <Field label="Status">
-                  <select
-                    className={formSelectClassName}
-                    value={form.status}
-                    onChange={(event) =>
-                      setForm((current) => ({
-                        ...current,
-                        status: event.target.value,
-                      }))
-                    }
-                  >
-                    {organizationStatusOptions
-                      .filter((option) => option.value !== 'all')
-                      .map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                  </select>
-                </Field>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving
-                    ? 'Saving...'
-                    : editingInstitutionId
-                      ? 'Save changes'
-                      : 'Create institution'}
-                </Button>
-                <Button
-                  type="button"
-                  className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                  onClick={() => {
-                    if (selectedInstitution) {
-                      setForm(institutionFormFromRecord(selectedInstitution));
-                      return;
-                    }
-                    setEditingInstitutionId(null);
-                    setForm(emptyInstitutionForm);
-                  }}
+              <Field label="Status">
+                <select
+                  className={formSelectClassName}
+                  value={form.status}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      status: event.target.value,
+                    }))
+                  }
                 >
-                  {selectedInstitution ? 'Reset form' : 'Clear form'}
-                </Button>
-              </div>
-            </form>
-          )}
-        </Card>
-      </div>
-    </div>
+                  {organizationStatusOptions
+                    .filter((option) => option.value !== 'all')
+                    .map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            </div>
+
+            {formError ? (
+              <div className="alert alert-danger">{formError}</div>
+            ) : null}
+          </form>
+        </Modal>
+      ) : null}
+    </RecordsPageLayout>
   );
 }

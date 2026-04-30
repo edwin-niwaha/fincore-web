@@ -235,6 +235,16 @@ export function ClientProfileView({ id }: { id: string }) {
               value={data?.national_id || null}
             />
             <DetailItem
+              label="Portal access"
+              value={
+                data?.user
+                  ? data?.user_full_name && data?.user_email
+                    ? `${data.user_full_name} (${data.user_email})`
+                    : data?.user_full_name || data?.user_email || 'Linked user'
+                  : 'Not linked'
+              }
+            />
+            <DetailItem
               label="Date of birth"
               value={formatDate(data?.date_of_birth || undefined)}
             />
@@ -251,6 +261,14 @@ export function ClientProfileView({ id }: { id: string }) {
               }
             />
             <DetailItem label="Address" value={data?.address || null} />
+            <DetailItem
+              label="Created by"
+              value={data?.created_by_email || 'System'}
+            />
+            <DetailItem
+              label="Last updated by"
+              value={data?.updated_by_email || 'System'}
+            />
             <DetailItem
               label="Profile updated"
               value={formatDate(data?.updated_at ?? data?.created_at)}
