@@ -353,19 +353,23 @@ export function ChartOfAccountsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-        <Card className="grid gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Ledger directory</CardTitle>
-              <p className="mt-1 text-sm text-slate-500">
-                System accounts stay protected while manual accounts can be added for operations and reporting.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={openCreateModal}>
+      <div className="w-full min-w-0">
+        <Card className="grid min-w-0 gap-4 p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Ledger directory</CardTitle>
+                <p className="mt-1 text-sm text-slate-500">
+                  System accounts stay protected while manual accounts can be added for operations and reporting.
+                </p>
+              </div>
+
+              <Button type="button" onClick={openCreateModal} className="w-full lg:w-auto">
                 New account
               </Button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {canChooseInstitution ? (
                 <select
                   className={formSelectClassName}
@@ -380,6 +384,7 @@ export function ChartOfAccountsPage() {
                   ))}
                 </select>
               ) : null}
+
               <select
                 className={formSelectClassName}
                 value={typeFilter}
@@ -392,6 +397,7 @@ export function ChartOfAccountsPage() {
                   </option>
                 ))}
               </select>
+
               <select
                 className={formSelectClassName}
                 value={statusFilter}
@@ -406,11 +412,13 @@ export function ChartOfAccountsPage() {
             </div>
           </div>
 
-          <DataTable<LedgerAccount>
-            data={accounts}
-            columns={columns}
-            emptyMessage="No ledger accounts matched this filter."
-          />
+          <div className="w-full min-w-0 overflow-x-auto">
+            <DataTable<LedgerAccount>
+              data={accounts}
+              columns={columns}
+              emptyMessage="No ledger accounts matched this filter."
+            />
+          </div>
         </Card>
       </div>
 

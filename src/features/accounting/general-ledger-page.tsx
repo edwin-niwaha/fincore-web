@@ -275,45 +275,71 @@ export function GeneralLedgerPage() {
         </div>
       </Card>
 
-      <div className="row">
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Opening balance</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(ledger.openingBalance)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Balance before the selected period begins.</p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Period debits</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(ledger.totalDebits)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Debit movement for the reporting range.</p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Period credits</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(ledger.totalCredits)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Credit movement for the reporting range.</p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Closing balance</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(ledger.closingBalance)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Running balance after all filtered entries.</p>
-          </Card>
-        </div>
-      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Opening Balance */}
+        <Card className="p-4 min-w-0">
+          <p className="text-sm font-semibold text-slate-500">Opening balance</p>
 
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+              {moneyPrecise(ledger.openingBalance).replace('USh', '').trim()}
+            </p>
+          </div>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Balance before the selected period begins.
+          </p>
+        </Card>
+
+        {/* Period Debits */}
+        <Card className="p-4 min-w-0">
+          <p className="text-sm font-semibold text-slate-500">Period debits</p>
+
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+              {moneyPrecise(ledger.totalDebits).replace('USh', '').trim()}
+            </p>
+          </div>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Debit movement for the reporting range.
+          </p>
+        </Card>
+
+        {/* Period Credits */}
+        <Card className="p-4 min-w-0">
+          <p className="text-sm font-semibold text-slate-500">Period credits</p>
+
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+              {moneyPrecise(ledger.totalCredits).replace('USh', '').trim()}
+            </p>
+          </div>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Credit movement for the reporting range.
+          </p>
+        </Card>
+
+        {/* Closing Balance */}
+        <Card className="p-4 min-w-0">
+          <p className="text-sm font-semibold text-slate-500">Closing balance</p>
+
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+              {moneyPrecise(ledger.closingBalance).replace('USh', '').trim()}
+            </p>
+          </div>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Running balance after all filtered entries.
+          </p>
+        </Card>
+      </div>
       <Card className="overflow-hidden p-0">
         <div className="card-header border-b border-slate-200 bg-slate-50/80 px-5 py-4">
           <div>

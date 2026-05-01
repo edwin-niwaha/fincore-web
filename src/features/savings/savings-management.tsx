@@ -119,12 +119,10 @@ function getProblemMessage(
 }
 
 function buildDateFilter(dateFilter: string) {
-  if (dateFilter === 'all') {
-    return {};
-  }
+  if (dateFilter === 'all') return {};
 
   const today = new Date();
-  let start = new Date(today);
+  const start = new Date(today);
 
   if (dateFilter === '7d') {
     start.setDate(today.getDate() - 6);
@@ -161,6 +159,25 @@ function transactionTypeBadge(transaction: SavingsTransaction) {
       status={isDeposit ? 'active' : 'pending'}
       label={transaction.type_label || statusLabel(transaction.type)}
     />
+  );
+}
+
+function MoneyInline({
+  value,
+  tone = 'text-[#127D61]',
+}: {
+  value: unknown;
+  tone?: string;
+}) {
+  return (
+    <div className="mt-2 flex items-end justify-between gap-2">
+      <span className="text-xs font-bold text-slate-500">USh</span>
+      <p
+        className={`max-w-[160px] break-words text-right text-lg font-black tabular-nums ${tone}`}
+      >
+        {money(value).replace('USh', '').trim()}
+      </p>
+    </div>
   );
 }
 
@@ -210,10 +227,12 @@ export function SavingsManagementPage() {
 
   const { data, error, isLoading, reload } = useApiResource(loadAccounts);
   const accounts = unwrapList(data);
+
   const selectedAccount =
     accounts.find((candidate) => String(candidate.id) === selectedAccountId) ??
     accounts[0] ??
     null;
+
   const activeAccountId = selectedAccount ? String(selectedAccount.id) : null;
 
   const loadTransactions = useCallback(() => {
@@ -226,7 +245,12 @@ export function SavingsManagementPage() {
       type: transactionTypeFilter === 'all' ? undefined : transactionTypeFilter,
       ...buildDateFilter(transactionDateFilter),
     });
-  }, [activeAccountId, transactionDateFilter, transactionPage, transactionTypeFilter]);
+  }, [
+    activeAccountId,
+    transactionDateFilter,
+    transactionPage,
+    transactionTypeFilter,
+  ]);
 
   const {
     data: transactionsData,
@@ -234,12 +258,11 @@ export function SavingsManagementPage() {
     isLoading: transactionsLoading,
     reload: reloadTransactions,
   } = useApiResource(loadTransactions);
+
   const transactions = unwrapList(transactionsData);
 
   const loadClientOptions = useCallback(() => {
-    if (!isCreateOpen) {
-      return Promise.resolve([] as Client[]);
-    }
+    if (!isCreateOpen) return Promise.resolve([] as Client[]);
 
     return clientsApi.list({
       search: debouncedClientSearch || undefined,
@@ -254,7 +277,9 @@ export function SavingsManagementPage() {
     isLoading: clientOptionsLoading,
     reload: reloadClientOptions,
   } = useApiResource(loadClientOptions);
+
   const clientOptions = unwrapList(clientOptionsData);
+
   const selectedClient =
     clientOptions.find((candidate) => String(candidate.id) === accountForm.client) ??
     null;
@@ -274,6 +299,7 @@ export function SavingsManagementPage() {
         hasPrevious: Boolean(transactionsData.previous),
       }
     : null;
+
   const createAccountFormId = 'create-savings-account-form';
   const operationFormId = 'savings-operation-form';
 
@@ -286,7 +312,7 @@ export function SavingsManagementPage() {
     {
       header: 'Account',
       accessor: (account) => (
-        <div>
+        <div className="min-w-[150px]">
           <p className="font-bold text-slate-900">
             {account.account_number ?? account.account_no ?? account.id}
           </p>
@@ -301,7 +327,7 @@ export function SavingsManagementPage() {
     {
       header: 'Client',
       accessor: (account) => (
-        <div>
+        <div className="min-w-[160px]">
           <p className="font-semibold text-slate-900">
             {account.client_name ?? clientName(account.client)}
           </p>
@@ -314,7 +340,7 @@ export function SavingsManagementPage() {
     {
       header: 'Assignment',
       accessor: (account) => (
-        <div>
+        <div className="min-w-[150px]">
           <p className="font-medium text-slate-800">
             {account.branch_name ?? 'No branch'}
           </p>
@@ -326,7 +352,11 @@ export function SavingsManagementPage() {
     },
     {
       header: 'Balance',
-      accessor: (account) => money(account.balance),
+      accessor: (account) => (
+        <span className="break-words text-right font-bold tabular-nums">
+          {money(account.balance)}
+        </span>
+      ),
       align: 'right',
     },
     {
@@ -336,7 +366,7 @@ export function SavingsManagementPage() {
     {
       header: 'Activity',
       accessor: (account) => (
-        <div>
+        <div className="min-w-[140px]">
           <p className="font-medium text-slate-800">
             {account.transaction_count ?? 0} transactions
           </p>
@@ -402,7 +432,7 @@ export function SavingsManagementPage() {
     {
       header: 'Reference',
       accessor: (row) => (
-        <div>
+        <div className="min-w-[160px]">
           <p className="font-bold text-slate-900">{row.reference ?? row.id}</p>
           <p className="text-xs text-slate-500">
             {row.performed_by_email || 'Recorded by system'}
@@ -416,12 +446,20 @@ export function SavingsManagementPage() {
     },
     {
       header: 'Amount',
-      accessor: (row) => money(row.amount),
+      accessor: (row) => (
+        <span className="break-words text-right font-bold tabular-nums">
+          {money(row.amount)}
+        </span>
+      ),
       align: 'right',
     },
     {
       header: 'Balance after',
-      accessor: (row) => money(row.balance_after),
+      accessor: (row) => (
+        <span className="break-words text-right font-bold tabular-nums">
+          {money(row.balance_after)}
+        </span>
+      ),
       align: 'right',
     },
     {
@@ -467,12 +505,16 @@ export function SavingsManagementPage() {
         client: accountForm.client,
         status: accountForm.status,
       });
+
       setSelectedAccountId(String(createdAccount.id));
       closeCreateAccountModal();
       toast.success('Savings account created');
       await reload();
     } catch (saveError) {
-      const message = getProblemMessage(saveError, 'Unable to create savings account.');
+      const message = getProblemMessage(
+        saveError,
+        'Unable to create savings account.',
+      );
       setAccountFormError(message);
       toast.error(message);
     } finally {
@@ -558,7 +600,7 @@ export function SavingsManagementPage() {
         },
         {
           label: 'Selected account',
-          value: selectedAccount ? money(selectedAccount.balance) : 'UGX 0',
+          value: selectedAccount ? money(selectedAccount.balance) : 'USh 0',
           hint: selectedAccount
             ? `${selectedAccount.account_number ?? selectedAccount.id} - ${
                 selectedAccount.transaction_count ?? 0
@@ -570,6 +612,7 @@ export function SavingsManagementPage() {
       filterPanel={
         <Card className="grid gap-4">
           <CardTitle>Search and filters</CardTitle>
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Field label="Search">
               <Input
@@ -619,7 +662,7 @@ export function SavingsManagementPage() {
         </Card>
       }
     >
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid min-w-0 gap-5">
         <RecordsListPanel
           title={isClient ? 'Savings accounts' : 'Savings account directory'}
           description={
@@ -647,16 +690,15 @@ export function SavingsManagementPage() {
             ) : undefined
           }
         >
-          <div className="grid gap-4 p-5">
+          <div className="grid min-w-0 gap-4 p-4 sm:p-5">
             {error && data ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                The savings list refresh failed, but your latest loaded records are still visible.
+                The savings list refresh failed, but your latest loaded records
+                are still visible.
                 <button
                   type="button"
                   className="ml-2 font-bold underline underline-offset-2"
-                  onClick={() => {
-                    void reload();
-                  }}
+                  onClick={() => void reload()}
                 >
                   Retry
                 </button>
@@ -671,270 +713,278 @@ export function SavingsManagementPage() {
                 onAction={reload}
               />
             ) : (
-              <DataTable<SavingsAccount>
-                data={accounts}
-                columns={accountColumns}
-                loading={isLoading}
-                emptyTitle={isClient ? 'No savings accounts yet' : 'No savings accounts found'}
-                emptyMessage={
-                  isClient
-                    ? 'No savings accounts are linked to your profile yet. Contact your branch staff for assistance.'
-                    : 'Try widening the current search or status filter.'
-                }
-                renderMobileCard={(account) => (
-                  <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-base font-bold text-slate-900">
-                            {account.account_number ?? account.account_no ?? account.id}
+              <div className="min-w-0 overflow-x-auto">
+                <DataTable<SavingsAccount>
+                  data={accounts}
+                  columns={accountColumns}
+                  loading={isLoading}
+                  emptyTitle={
+                    isClient ? 'No savings accounts yet' : 'No savings accounts found'
+                  }
+                  emptyMessage={
+                    isClient
+                      ? 'No savings accounts are linked to your profile yet. Contact your branch staff for assistance.'
+                      : 'Try widening the current search or status filter.'
+                  }
+                  renderMobileCard={(account) => (
+                    <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-base font-bold text-slate-900">
+                              {account.account_number ?? account.account_no ?? account.id}
+                            </p>
+                            <StatusBadge status={account.status} />
+                          </div>
+                          <p className="mt-1 text-sm font-semibold text-slate-600">
+                            {account.client_name ?? clientName(account.client)}
                           </p>
-                          <StatusBadge status={account.status} />
                         </div>
-                        <p className="mt-1 text-sm font-semibold text-slate-600">
-                          {account.client_name ?? clientName(account.client)}
-                        </p>
-                      </div>
-                      <RowActions
-                        actions={[
-                          {
-                            key: 'view',
-                            label: 'View',
-                            tone: 'success',
-                            onClick: () => {
-                              setSelectedAccountId(String(account.id));
-                              setTransactionPage(1);
-                            },
-                          },
-                          {
-                            key: 'deposit',
-                            label: 'Deposit',
-                            hidden: !canManageCash,
-                            onClick: () => {
-                              setSelectedAccountId(String(account.id));
-                              setTransactionPage(1);
-                              setOperationMode('deposit');
-                              setOperationAccountId(String(account.id));
-                              setOperationForm(createEmptyOperationForm());
-                              setOperationError(null);
-                            },
-                          },
-                          {
-                            key: 'withdraw',
-                            label: 'Withdraw',
-                            hidden: !canManageCash,
-                            onClick: () => {
-                              setSelectedAccountId(String(account.id));
-                              setTransactionPage(1);
-                              setOperationMode('withdrawal');
-                              setOperationAccountId(String(account.id));
-                              setOperationForm(createEmptyOperationForm());
-                              setOperationError(null);
-                            },
-                          },
-                        ]}
-                        align="end"
-                      />
-                    </div>
 
-                    <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Balance
-                        </p>
-                        <p className="mt-1 font-medium text-slate-800">
-                          {money(account.balance)}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {account.transaction_count ?? 0} transactions
-                        </p>
+                        <RowActions
+                          actions={[
+                            {
+                              key: 'view',
+                              label: 'View',
+                              tone: 'success',
+                              onClick: () => {
+                                setSelectedAccountId(String(account.id));
+                                setTransactionPage(1);
+                              },
+                            },
+                            {
+                              key: 'deposit',
+                              label: 'Deposit',
+                              hidden: !canManageCash,
+                              onClick: () => {
+                                setSelectedAccountId(String(account.id));
+                                setTransactionPage(1);
+                                setOperationMode('deposit');
+                                setOperationAccountId(String(account.id));
+                                setOperationForm(createEmptyOperationForm());
+                                setOperationError(null);
+                              },
+                            },
+                            {
+                              key: 'withdraw',
+                              label: 'Withdraw',
+                              hidden: !canManageCash,
+                              onClick: () => {
+                                setSelectedAccountId(String(account.id));
+                                setTransactionPage(1);
+                                setOperationMode('withdrawal');
+                                setOperationAccountId(String(account.id));
+                                setOperationForm(createEmptyOperationForm());
+                                setOperationError(null);
+                              },
+                            },
+                          ]}
+                          align="end"
+                        />
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Assignment
-                        </p>
-                        <p className="mt-1 font-medium text-slate-800">
-                          {account.branch_name ?? 'No branch'}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {account.institution_name ?? 'No institution'}
-                        </p>
+
+                      <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Balance
+                          </p>
+                          <p className="mt-1 break-words font-medium text-slate-800 tabular-nums">
+                            {money(account.balance)}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {account.transaction_count ?? 0} transactions
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Assignment
+                          </p>
+                          <p className="mt-1 font-medium text-slate-800">
+                            {account.branch_name ?? 'No branch'}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {account.institution_name ?? 'No institution'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                )}
-              />
+                    </article>
+                  )}
+                />
+              </div>
             )}
           </div>
         </RecordsListPanel>
 
-        <div className="grid gap-6">
-          <Card className="grid gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle>
-                  {selectedAccount
-                    ? selectedAccount.account_number ?? 'Selected account'
-                    : isClient
-                      ? 'My account summary'
-                      : 'Select a savings account'}
-                </CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedAccount
-                    ? `${selectedAccount.client_name ?? clientName(selectedAccount.client)} - ${
-                        selectedAccount.branch_name ?? 'No branch'
-                      }`
-                    : 'Choose an account from the list to view balances and transaction history.'}
-                </p>
-              </div>
-              {selectedAccount ? (
-                <StatusBadge status={selectedAccount.status} />
-              ) : null}
+        <Card className="grid min-w-0 gap-4 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle>
+                {selectedAccount
+                  ? selectedAccount.account_number ?? 'Selected account'
+                  : isClient
+                    ? 'My account summary'
+                    : 'Select a savings account'}
+              </CardTitle>
+              <p className="mt-1 text-sm text-slate-500">
+                {selectedAccount
+                  ? `${selectedAccount.client_name ?? clientName(selectedAccount.client)} - ${
+                      selectedAccount.branch_name ?? 'No branch'
+                    }`
+                  : 'Choose an account from the list to view balances and transaction history.'}
+              </p>
             </div>
 
-            {selectedAccount ? (
-              <>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                      Current balance
-                    </p>
-                    <p className="mt-2 text-2xl font-black text-[#127D61]">
-                      {money(selectedAccount.balance)}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {selectedAccount.transaction_count ?? 0} total transactions
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                      Client contact
-                    </p>
-                    <p className="mt-2 font-semibold text-slate-900">
-                      {selectedAccount.client_name ?? clientName(selectedAccount.client)}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                      {selectedAccount.client_phone || 'No phone on file'}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Last activity {formatDate(selectedAccount.last_transaction_at || undefined)}
-                    </p>
-                  </div>
+            {selectedAccount ? <StatusBadge status={selectedAccount.status} /> : null}
+          </div>
+
+          {selectedAccount ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    Current balance
+                  </p>
+                  <MoneyInline value={selectedAccount.balance} />
+                  <p className="mt-1 text-sm text-slate-500">
+                    {selectedAccount.transaction_count ?? 0} total transactions
+                  </p>
                 </div>
 
-                {canManageCash ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setOperationMode('deposit');
-                        setOperationAccountId(String(selectedAccount.id));
-                        setOperationForm(createEmptyOperationForm());
-                        setOperationError(null);
-                      }}
-                    >
-                      Record deposit
-                    </Button>
-                    <Button
-                      type="button"
-                      className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                      onClick={() => {
-                        setOperationMode('withdrawal');
-                        setOperationAccountId(String(selectedAccount.id));
-                        setOperationForm(createEmptyOperationForm());
-                        setOperationError(null);
-                      }}
-                    >
-                      Record withdrawal
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    Savings records are read-only in self-service. Contact your branch staff for deposits, withdrawals, or account changes.
-                  </div>
-                )}
-              </>
-            ) : (
-              <StateView
-                title="No savings account selected"
-                description={
-                  accounts.length
-                    ? 'Select any savings account from the list to inspect its transaction history.'
-                    : isClient
-                      ? 'No savings accounts are linked to your profile yet.'
-                      : 'Create a savings account to begin recording member deposits and withdrawals.'
-                }
-              />
-            )}
-          </Card>
-
-          <Card className="overflow-hidden p-0">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4">
-              <div className="max-w-2xl">
-                <CardTitle>
-                  {isClient ? 'My savings transactions' : 'Transaction history'}
-                </CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedAccount
-                    ? `Review deposits and withdrawals for ${selectedAccount.account_number ?? selectedAccount.id}.`
-                    : 'Transaction history appears after you select a savings account.'}
-                </p>
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    Client contact
+                  </p>
+                  <p className="mt-2 break-words font-semibold text-slate-900">
+                    {selectedAccount.client_name ?? clientName(selectedAccount.client)}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {selectedAccount.client_phone || 'No phone on file'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Last activity{' '}
+                    {formatDate(selectedAccount.last_transaction_at || undefined)}
+                  </p>
+                </div>
               </div>
+
+              {canManageCash ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setOperationMode('deposit');
+                      setOperationAccountId(String(selectedAccount.id));
+                      setOperationForm(createEmptyOperationForm());
+                      setOperationError(null);
+                    }}
+                  >
+                    Record deposit
+                  </Button>
+                  <Button
+                    type="button"
+                    className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                    onClick={() => {
+                      setOperationMode('withdrawal');
+                      setOperationAccountId(String(selectedAccount.id));
+                      setOperationForm(createEmptyOperationForm());
+                      setOperationError(null);
+                    }}
+                  >
+                    Record withdrawal
+                  </Button>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Savings records are read-only in self-service. Contact your
+                  branch staff for deposits, withdrawals, or account changes.
+                </div>
+              )}
+            </>
+          ) : (
+            <StateView
+              title="No savings account selected"
+              description={
+                accounts.length
+                  ? 'Select any savings account from the list to inspect its transaction history.'
+                  : isClient
+                    ? 'No savings accounts are linked to your profile yet.'
+                    : 'Create a savings account to begin recording member deposits and withdrawals.'
+              }
+            />
+          )}
+        </Card>
+
+        <Card className="min-w-0 overflow-hidden p-0">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/70 px-4 py-4 sm:px-5">
+            <div className="max-w-2xl">
+              <CardTitle>
+                {isClient ? 'My savings transactions' : 'Transaction history'}
+              </CardTitle>
+              <p className="mt-1 text-sm text-slate-500">
+                {selectedAccount
+                  ? `Review deposits and withdrawals for ${
+                      selectedAccount.account_number ?? selectedAccount.id
+                    }.`
+                  : 'Transaction history appears after you select a savings account.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid min-w-0 gap-4 p-4 sm:p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Transaction type">
+                <select
+                  className={formSelectClassName}
+                  value={transactionTypeFilter}
+                  onChange={(event) => {
+                    setTransactionTypeFilter(event.target.value);
+                    setTransactionPage(1);
+                  }}
+                  disabled={!selectedAccount}
+                >
+                  {transactionTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Date window">
+                <select
+                  className={formSelectClassName}
+                  value={transactionDateFilter}
+                  onChange={(event) => {
+                    setTransactionDateFilter(event.target.value);
+                    setTransactionPage(1);
+                  }}
+                  disabled={!selectedAccount}
+                >
+                  {transactionDateOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
             </div>
 
-            <div className="grid gap-4 p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Transaction type">
-                  <select
-                    className={formSelectClassName}
-                    value={transactionTypeFilter}
-                    onChange={(event) => {
-                      setTransactionTypeFilter(event.target.value);
-                      setTransactionPage(1);
-                    }}
-                    disabled={!selectedAccount}
-                  >
-                    {transactionTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label="Date window">
-                  <select
-                    className={formSelectClassName}
-                    value={transactionDateFilter}
-                    onChange={(event) => {
-                      setTransactionDateFilter(event.target.value);
-                      setTransactionPage(1);
-                    }}
-                    disabled={!selectedAccount}
-                  >
-                    {transactionDateOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-
-              {!selectedAccount ? (
-                <StateView
-                  title="Choose an account first"
-                  description="Transaction history will appear here once you select a savings account from the list."
-                />
-              ) : transactionsError && !transactionsData ? (
-                <StateView
-                  title="Could not load savings transactions"
-                  description={transactionsError}
-                  actionLabel="Retry"
-                  onAction={reloadTransactions}
-                />
-              ) : (
-                <>
+            {!selectedAccount ? (
+              <StateView
+                title="Choose an account first"
+                description="Transaction history will appear here once you select a savings account from the list."
+              />
+            ) : transactionsError && !transactionsData ? (
+              <StateView
+                title="Could not load savings transactions"
+                description={transactionsError}
+                actionLabel="Retry"
+                onAction={reloadTransactions}
+              />
+            ) : (
+              <>
+                <div className="min-w-0 overflow-x-auto">
                   <DataTable<SavingsTransaction>
                     data={transactions}
                     columns={transactionColumns}
@@ -944,14 +994,15 @@ export function SavingsManagementPage() {
                     renderMobileCard={(row) => (
                       <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-base font-bold text-slate-900">
+                          <div className="min-w-0">
+                            <p className="break-words text-base font-bold text-slate-900">
                               {row.reference ?? row.id}
                             </p>
                             <p className="mt-1 text-sm text-slate-500">
                               {formatDate(row.created_at)}
                             </p>
                           </div>
+
                           {transactionTypeBadge(row)}
                         </div>
 
@@ -960,15 +1011,16 @@ export function SavingsManagementPage() {
                             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
                               Amount
                             </p>
-                            <p className="mt-1 font-medium text-slate-800">
+                            <p className="mt-1 break-words font-medium text-slate-800 tabular-nums">
                               {money(row.amount)}
                             </p>
                           </div>
+
                           <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
                             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
                               Balance after
                             </p>
-                            <p className="mt-1 font-medium text-slate-800">
+                            <p className="mt-1 break-words font-medium text-slate-800 tabular-nums">
                               {money(row.balance_after)}
                             </p>
                           </div>
@@ -976,22 +1028,22 @@ export function SavingsManagementPage() {
                       </article>
                     )}
                   />
+                </div>
 
-                  {transactionPagination ? (
-                    <RecordsPagination
-                      count={transactionPagination.count}
-                      page={transactionPage}
-                      rowsOnPage={transactions.length}
-                      hasNext={transactionPagination.hasNext}
-                      hasPrevious={transactionPagination.hasPrevious}
-                      onPageChange={setTransactionPage}
-                    />
-                  ) : null}
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
+                {transactionPagination ? (
+                  <RecordsPagination
+                    count={transactionPagination.count}
+                    page={transactionPage}
+                    rowsOnPage={transactions.length}
+                    hasNext={transactionPagination.hasNext}
+                    hasPrevious={transactionPagination.hasPrevious}
+                    onPageChange={setTransactionPage}
+                  />
+                ) : null}
+              </>
+            )}
+          </div>
+        </Card>
       </div>
 
       {isCreateOpen ? (
@@ -1020,109 +1072,108 @@ export function SavingsManagementPage() {
             </>
           }
         >
-              <form
-                className="grid gap-4"
-                id={createAccountFormId}
-                onSubmit={handleCreateAccount}
-              >
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Search clients">
-                    <Input
-                      value={clientSearch}
-                      onChange={(event) => setClientSearch(event.target.value)}
-                      placeholder="Member number, name, or phone"
-                    />
-                  </Field>
+          <form
+            className="grid gap-4"
+            id={createAccountFormId}
+            onSubmit={handleCreateAccount}
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Search clients">
+                <Input
+                  value={clientSearch}
+                  onChange={(event) => setClientSearch(event.target.value)}
+                  placeholder="Member number, name, or phone"
+                />
+              </Field>
 
-                  <Field label="Account status">
-                    <select
-                      className={formSelectClassName}
-                      value={accountForm.status}
-                      onChange={(event) =>
-                        setAccountForm((current) => ({
-                          ...current,
-                          status: event.target.value,
-                        }))
-                      }
-                    >
-                      {savingsStatusOptions
-                        .filter((option) => option.value !== 'all')
-                        .map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                    </select>
-                  </Field>
-                </div>
-
-                <Field label="Client">
-                  <select
-                    className={formSelectClassName}
-                    value={accountForm.client}
-                    onChange={(event) =>
-                      setAccountForm((current) => ({
-                        ...current,
-                        client: event.target.value,
-                      }))
-                    }
-                    disabled={clientOptionsLoading && !clientOptionsData}
-                    required
-                  >
-                    <option value="">Select a client</option>
-                    {clientOptions.map((client) => (
-                      <option key={client.id} value={String(client.id)}>
-                        {clientOptionLabel(client)}
+              <Field label="Account status">
+                <select
+                  className={formSelectClassName}
+                  value={accountForm.status}
+                  onChange={(event) =>
+                    setAccountForm((current) => ({
+                      ...current,
+                      status: event.target.value,
+                    }))
+                  }
+                >
+                  {savingsStatusOptions
+                    .filter((option) => option.value !== 'all')
+                    .map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
-                  </select>
-                </Field>
+                </select>
+              </Field>
+            </div>
 
-                {clientOptionsError ? (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    Could not load clients for savings account creation.
-                    <button
-                      type="button"
-                      className="ml-2 font-bold underline underline-offset-2"
-                      onClick={() => {
-                        void reloadClientOptions();
-                      }}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : null}
+            <Field label="Client">
+              <select
+                className={formSelectClassName}
+                value={accountForm.client}
+                onChange={(event) =>
+                  setAccountForm((current) => ({
+                    ...current,
+                    client: event.target.value,
+                  }))
+                }
+                disabled={clientOptionsLoading && !clientOptionsData}
+                required
+              >
+                <option value="">Select a client</option>
+                {clientOptions.map((client) => (
+                  <option key={client.id} value={String(client.id)}>
+                    {clientOptionLabel(client)}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-                {!clientOptionsLoading &&
-                isCreateOpen &&
-                !clientOptions.length &&
-                !clientOptionsError ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    No active clients matched this search. Create or activate the client first from the Clients page.
-                  </div>
-                ) : null}
+            {clientOptionsError ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Could not load clients for savings account creation.
+                <button
+                  type="button"
+                  className="ml-2 font-bold underline underline-offset-2"
+                  onClick={() => void reloadClientOptions()}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : null}
 
-                {selectedClient ? (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-                    <p className="font-bold">
-                      {selectedClient.full_name || clientName(selectedClient)}
-                    </p>
-                    <p className="mt-1">
-                      {selectedClient.member_number || selectedClient.id}
-                      {selectedClient.branch_name ? ` - ${selectedClient.branch_name}` : ''}
-                    </p>
-                    <p className="mt-1 text-xs text-emerald-700">
-                      {selectedClient.phone || 'No phone on file'}
-                    </p>
-                  </div>
-                ) : null}
+            {!clientOptionsLoading &&
+            isCreateOpen &&
+            !clientOptions.length &&
+            !clientOptionsError ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                No active clients matched this search. Create or activate the
+                client first from the Clients page.
+              </div>
+            ) : null}
 
-                {accountFormError ? (
-                  <div className="alert alert-danger">
-                    {accountFormError}
-                  </div>
-                ) : null}
-              </form>
+            {selectedClient ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                <p className="font-bold">
+                  {selectedClient.full_name || clientName(selectedClient)}
+                </p>
+                <p className="mt-1">
+                  {selectedClient.member_number || selectedClient.id}
+                  {selectedClient.branch_name
+                    ? ` - ${selectedClient.branch_name}`
+                    : ''}
+                </p>
+                <p className="mt-1 text-xs text-emerald-700">
+                  {selectedClient.phone || 'No phone on file'}
+                </p>
+              </div>
+            ) : null}
+
+            {accountFormError ? (
+              <div className="alert alert-danger">{accountFormError}</div>
+            ) : null}
+          </form>
         </Modal>
       ) : null}
 
@@ -1170,80 +1221,79 @@ export function SavingsManagementPage() {
             )
           }
         >
-              {operationTargetAccount ? (
-                <form
-                  className="grid gap-4"
-                  id={operationFormId}
-                  onSubmit={handleSubmitOperation}
-                >
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    <p className="font-bold text-slate-900">
-                      {operationTargetAccount.client_name ??
-                        clientName(operationTargetAccount.client)}
-                    </p>
-                    <p className="mt-1">
-                      {operationTargetAccount.account_number ?? operationTargetAccount.id}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Current balance {money(operationTargetAccount.balance)}
-                    </p>
-                  </div>
+          {operationTargetAccount ? (
+            <form
+              className="grid gap-4"
+              id={operationFormId}
+              onSubmit={handleSubmitOperation}
+            >
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <p className="font-bold text-slate-900">
+                  {operationTargetAccount.client_name ??
+                    clientName(operationTargetAccount.client)}
+                </p>
+                <p className="mt-1">
+                  {operationTargetAccount.account_number ??
+                    operationTargetAccount.id}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Current balance {money(operationTargetAccount.balance)}
+                </p>
+              </div>
 
-                  <Field label="Amount">
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={operationForm.amount}
-                      onChange={(event) =>
-                        setOperationForm((current) => ({
-                          ...current,
-                          amount: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </Field>
-
-                  <Field label="Reference">
-                    <Input
-                      value={operationForm.reference}
-                      onChange={(event) =>
-                        setOperationForm((current) => ({
-                          ...current,
-                          reference: event.target.value,
-                        }))
-                      }
-                      placeholder="Cash receipt or voucher reference"
-                      required
-                    />
-                  </Field>
-
-                  <Field label="Notes">
-                    <Input
-                      value={operationForm.notes}
-                      onChange={(event) =>
-                        setOperationForm((current) => ({
-                          ...current,
-                          notes: event.target.value,
-                        }))
-                      }
-                      placeholder="Optional notes for the teller or branch record"
-                    />
-                  </Field>
-
-                  {operationError ? (
-                    <div className="alert alert-danger">
-                      {operationError}
-                    </div>
-                  ) : null}
-                </form>
-              ) : (
-                <StateView
-                  title="Savings account not found"
-                  description="Choose a valid savings account before recording a cash transaction."
+              <Field label="Amount">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={operationForm.amount}
+                  onChange={(event) =>
+                    setOperationForm((current) => ({
+                      ...current,
+                      amount: event.target.value,
+                    }))
+                  }
+                  required
                 />
-              )}
+              </Field>
+
+              <Field label="Reference">
+                <Input
+                  value={operationForm.reference}
+                  onChange={(event) =>
+                    setOperationForm((current) => ({
+                      ...current,
+                      reference: event.target.value,
+                    }))
+                  }
+                  placeholder="Cash receipt or voucher reference"
+                  required
+                />
+              </Field>
+
+              <Field label="Notes">
+                <Input
+                  value={operationForm.notes}
+                  onChange={(event) =>
+                    setOperationForm((current) => ({
+                      ...current,
+                      notes: event.target.value,
+                    }))
+                  }
+                  placeholder="Optional notes for the teller or branch record"
+                />
+              </Field>
+
+              {operationError ? (
+                <div className="alert alert-danger">{operationError}</div>
+              ) : null}
+            </form>
+          ) : (
+            <StateView
+              title="Savings account not found"
+              description="Choose a valid savings account before recording a cash transaction."
+            />
+          )}
         </Modal>
       ) : null}
     </RecordsPageLayout>

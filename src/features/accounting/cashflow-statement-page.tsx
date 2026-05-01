@@ -267,46 +267,57 @@ export function CashflowStatementPage() {
         </div>
       </Card>
 
-      <div className="row">
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Opening cash</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(cashflow.openingBalance)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Cash and bank balance before the period.</p>
-          </Card>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <Card className="min-w-0 p-4">
+        <p className="text-sm font-semibold text-slate-500">Opening cash</p>
+        <div className="mt-3 flex items-end justify-between gap-2">
+          <span className="text-xs font-bold text-slate-500">USh</span>
+          <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+            {moneyPrecise(cashflow.openingBalance).replace('USh', '').trim()}
+          </p>
         </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Cash inflows</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(cashflow.totalInflows)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Deposits, repayments, and other receipts.</p>
-          </Card>
+        <p className="mt-2 text-sm text-slate-500">Cash and bank balance before the period.</p>
+      </Card>
+
+      <Card className="min-w-0 p-4">
+        <p className="text-sm font-semibold text-slate-500">Cash inflows</p>
+        <div className="mt-3 flex items-end justify-between gap-2">
+          <span className="text-xs font-bold text-slate-500">USh</span>
+          <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+            {moneyPrecise(cashflow.totalInflows).replace('USh', '').trim()}
+          </p>
         </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Cash outflows</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(cashflow.totalOutflows)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">Withdrawals, disbursements, and other payouts.</p>
-          </Card>
+        <p className="mt-2 text-sm text-slate-500">Deposits, repayments, and other receipts.</p>
+      </Card>
+
+      <Card className="min-w-0 p-4">
+        <p className="text-sm font-semibold text-slate-500">Cash outflows</p>
+        <div className="mt-3 flex items-end justify-between gap-2">
+          <span className="text-xs font-bold text-slate-500">USh</span>
+          <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+            {moneyPrecise(cashflow.totalOutflows).replace('USh', '').trim()}
+          </p>
         </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Closing cash</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(cashflow.closingBalance)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Net cashflow {moneyPrecise(cashflow.netCashflow)} for the selected period.
-            </p>
-          </Card>
+        <p className="mt-2 text-sm text-slate-500">Withdrawals, disbursements, and other payouts.</p>
+      </Card>
+
+      <Card className="min-w-0 p-4">
+        <p className="text-sm font-semibold text-slate-500">Closing cash</p>
+        <div className="mt-3 flex items-end justify-between gap-2">
+          <span className="text-xs font-bold text-slate-500">USh</span>
+          <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+            {moneyPrecise(cashflow.closingBalance).replace('USh', '').trim()}
+          </p>
         </div>
-      </div>
+        <p className="mt-2 text-sm text-slate-500">
+          Net cashflow{' '}
+          <span className="font-bold tabular-nums">
+            {moneyPrecise(cashflow.netCashflow)}
+          </span>{' '}
+          for the selected period.
+        </p>
+      </Card>
+    </div>
 
       {cashflow.cashAccounts.length ? (
         <Card className="overflow-hidden p-0">

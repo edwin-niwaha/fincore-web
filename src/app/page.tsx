@@ -13,7 +13,6 @@ import {
   LockKeyhole,
   Mail,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 
 import { GoogleLoginButton } from '@/components/auth/google-login-button';
@@ -134,8 +133,10 @@ function PremiumFinanceSvg() {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginWithGoogle, isLoading } = useAuth();
+  const { user, login, loginWithGoogle, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+
+  const dashboardHref = user ? dashboardPathForRole(user.role) : '/login';
 
   const {
     register,
@@ -146,26 +147,26 @@ export default function LoginPage() {
   });
 
   const redirectAfterAuth = useCallback(
-    async (user: Awaited<ReturnType<typeof login>>) => {
-      if (!user.is_email_verified) {
+    async (loggedInUser: Awaited<ReturnType<typeof login>>) => {
+      if (!loggedInUser.is_email_verified) {
         router.replace('/verify-email');
         return;
       }
 
-      router.replace(dashboardPathForRole(user.role));
+      router.replace(dashboardPathForRole(loggedInUser.role));
     },
     [router],
   );
 
   async function onSubmit(values: LoginForm) {
-    const user = await login(values.email, values.password);
-    await redirectAfterAuth(user);
+    const loggedInUser = await login(values.email, values.password);
+    await redirectAfterAuth(loggedInUser);
   }
 
   const handleGoogleToken = useCallback(
     async (accessToken: string) => {
-      const user = await loginWithGoogle(accessToken);
-      await redirectAfterAuth(user);
+      const loggedInUser = await loginWithGoogle(accessToken);
+      await redirectAfterAuth(loggedInUser);
     },
     [loginWithGoogle, redirectAfterAuth],
   );
@@ -180,7 +181,7 @@ export default function LoginPage() {
           <div className="absolute left-10 top-28 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl" />
           <div className="absolute bottom-10 right-10 h-80 w-80 rounded-full bg-orange-400/10 blur-3xl" />
 
-          <div className="relative z-10 flex items-center justify-between">
+          <div className="relative z-10 flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3">
               <Image
                 src="/images/logo.png"
@@ -195,9 +196,18 @@ export default function LoginPage() {
               </span>
             </Link>
 
-            <span className="rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wide text-emerald-50 ring-1 ring-white/15">
-              Secure SACCO Platform
-            </span>
+{user ? (
+  <span className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-emerald-50 ring-1 ring-white/15">
+    Logged in as{' '}
+    <span className="font-bold text-white">
+      {user.full_name || user.username || user.email}
+    </span>
+  </span>
+) : (
+  <span className="rounded-full bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wide text-emerald-50 ring-1 ring-white/15">
+    Secure SACCO Platform
+  </span>
+)}
           </div>
 
           <div className="relative z-10 flex flex-1 flex-col items-center justify-center">
@@ -220,12 +230,21 @@ export default function LoginPage() {
                 FinCore
               </Link>
 
-              <Link
-                href="/"
-                className="text-sm font-bold text-slate-500 hover:text-slate-900"
-              >
-                Home
-              </Link>
+              {user ? (
+                <Link
+                  href={dashboardHref}
+                  className="rounded-full bg-[#127D61] px-4 py-2 text-sm font-bold text-white shadow-md shadow-emerald-900/20"
+                >
+                  Dashboard
+                </Link>
+              ) : (
+                <Link
+                  href="/"
+                  className="text-sm font-bold text-slate-500 hover:text-slate-900"
+                >
+                  Home
+                </Link>
+              )}
             </div>
 
             <div className="rounded-[2rem] border border-white bg-white/90 p-5 shadow-2xl shadow-slate-300/70 backdrop-blur sm:p-8">
@@ -241,13 +260,21 @@ export default function LoginPage() {
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   Sign in securely to continue to FinCore.
                 </p>
+
+                  {user ? (
+                    <Link
+                      href={dashboardHref}
+                      className="mt-4 inline-flex h-11 items-center justify-center rounded-xl bg-[#127D61] px-5 text-sm font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:-translate-y-0.5 hover:bg-emerald-700"
+                    >
+                      Go to Dashboard
+                    </Link>
+                  ) : null}
               </div>
 
               <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
                 <Field label="Email address" error={errors.email?.message}>
-                  <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 h-12 focus-within:ring-2 focus-within:ring-[#127D61]/20 focus-within:border-[#127D61]">
-                    
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-[#127D61] shrink-0">
+                  <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#127D61] focus-within:ring-2 focus-within:ring-[#127D61]/20">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-[#127D61]">
                       <Mail className="h-4 w-4" />
                     </div>
 
@@ -255,30 +282,29 @@ export default function LoginPage() {
                       autoComplete="email"
                       type="email"
                       placeholder="you@example.com"
-                      className="h-full border-0 bg-transparent p-0 focus:ring-0 focus:outline-none"
+                      className="h-full border-0 bg-transparent p-0 focus:outline-none focus:ring-0"
                       {...register('email')}
                     />
                   </div>
                 </Field>
 
                 <Field label="Password" error={errors.password?.message}>
-                  <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 h-12 focus-within:ring-2 focus-within:ring-[#127D61]/20 focus-within:border-[#127D61]">
-
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-[#127D61] shrink-0">
+                  <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#127D61] focus-within:ring-2 focus-within:ring-[#127D61]/20">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-[#127D61]">
                       <LockKeyhole className="h-4 w-4" />
                     </div>
 
                     <Input
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
-                      className="h-full flex-1 border-0 bg-transparent p-0 focus:ring-0 focus:outline-none"
+                      className="h-full flex-1 border-0 bg-transparent p-0 focus:outline-none focus:ring-0"
                       {...register('password')}
                     />
 
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-400 hover:text-slate-700"
+                      onClick={() => setShowPassword((current) => !current)}
+                      className="shrink-0 text-slate-400 hover:text-slate-700"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>

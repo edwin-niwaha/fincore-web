@@ -265,51 +265,66 @@ export function BalanceSheetPage() {
         </div>
       </Card>
 
-      <div className="row">
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Assets</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(balanceSheet.totalAssets)}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="min-w-0 p-4">
+          <p className="text-sm font-semibold text-slate-500">Assets</p>
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+              {moneyPrecise(balanceSheet.totalAssets).replace('USh', '').trim()}
             </p>
-            <p className="mt-2 text-sm text-slate-500">{balanceSheet.assets.length} asset accounts in scope.</p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Liabilities</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(balanceSheet.totalLiabilities)}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            {balanceSheet.assets.length} asset accounts in scope.
+          </p>
+        </Card>
+
+        <Card className="min-w-0 p-4">
+          <p className="text-sm font-semibold text-slate-500">Liabilities</p>
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+              {moneyPrecise(balanceSheet.totalLiabilities).replace('USh', '').trim()}
             </p>
-            <p className="mt-2 text-sm text-slate-500">{balanceSheet.liabilities.length} liability accounts in scope.</p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Equity</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(balanceSheet.totalEquity)}
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            {balanceSheet.liabilities.length} liability accounts in scope.
+          </p>
+        </Card>
+
+        <Card className="min-w-0 p-4">
+          <p className="text-sm font-semibold text-slate-500">Equity</p>
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-[#127D61]">
+              {moneyPrecise(balanceSheet.totalEquity).replace('USh', '').trim()}
             </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Includes retained earnings of {moneyPrecise(balanceSheet.retainedEarnings)}.
-            </p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card>
-            <p className="text-sm font-semibold text-slate-500">Difference</p>
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            Includes retained earnings of{' '}
+            <span className="font-bold tabular-nums">
+              {moneyPrecise(balanceSheet.retainedEarnings)}
+            </span>
+            .
+          </p>
+        </Card>
+
+        <Card className="min-w-0 p-4">
+          <p className="text-sm font-semibold text-slate-500">Difference</p>
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
             <p
-              className={`mt-3 text-3xl font-black tracking-tight ${
+              className={`max-w-[140px] break-words text-right text-lg font-black tabular-nums ${
                 balanceSheet.isBalanced ? 'text-emerald-700' : 'text-rose-700'
               }`}
             >
-              {moneyPrecise(balanceSheet.difference)}
+              {moneyPrecise(balanceSheet.difference).replace('USh', '').trim()}
             </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Assets vs liabilities + equity control value.
-            </p>
-          </Card>
-        </div>
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            Assets vs liabilities + equity control value.
+          </p>
+        </Card>
       </div>
 
       <div className="row">

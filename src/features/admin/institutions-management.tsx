@@ -304,7 +304,7 @@ export function InstitutionsManagementPage() {
         </Card>
       }
     >
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+      <div className="w-full">
         <RecordsListPanel
           title="Institution directory"
           description={

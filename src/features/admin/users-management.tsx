@@ -49,17 +49,13 @@ function flattenErrorList(value: unknown): string | null {
   return null;
 }
 
-function getProblemMessage(
-  error: unknown,
-  fallback = 'Unable to save user changes.',
-) {
+function getProblemMessage(error: unknown, fallback = 'Unable to save user changes.') {
   const problem = error as ApiProblem;
+
   if (problem?.message) return problem.message;
 
   if (problem?.errors && typeof problem.errors === 'object') {
-    const first = Object.values(problem.errors)
-      .map(flattenErrorList)
-      .find(Boolean);
+    const first = Object.values(problem.errors).map(flattenErrorList).find(Boolean);
     if (first) return first;
   }
 
@@ -104,6 +100,7 @@ function branchInstitutionId(branch: Branch) {
   if (typeof branch.institution === 'object') {
     return branch.institution?.id ? String(branch.institution.id) : '';
   }
+
   return branch.institution ? String(branch.institution) : '';
 }
 
@@ -146,9 +143,11 @@ function statusClassName(isActive?: boolean) {
 
 export function UsersManagementPage() {
   const { user } = useAuth();
+
   const actorRole = user?.role ?? null;
   const allowedRoleOptions = roleOptionsForActor(actorRole);
   const defaultRole = allowedRoleOptions[0]?.value ?? 'client';
+
   const fixedInstitutionId = user?.institution ? String(user.institution) : '';
   const fixedBranchId = user?.branch ? String(user.branch) : '';
 
@@ -157,24 +156,25 @@ export function UsersManagementPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [institutionFilter, setInstitutionFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
+
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTogglingUserId, setIsTogglingUserId] = useState<string | null>(null);
+
   const [form, setForm] = useState<UserFormState>(() =>
     createEmptyUserForm(defaultRole, fixedInstitutionId, fixedBranchId),
   );
+
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
 
   const loadUsers = useCallback(
     () =>
       adminApi.users.list({
         role: roleFilter === 'all' ? undefined : roleFilter,
-        is_active:
-          activeFilter === 'all' ? undefined : activeFilter === 'active',
-        institution:
-          institutionFilter === 'all' ? undefined : institutionFilter,
+        is_active: activeFilter === 'all' ? undefined : activeFilter === 'active',
+        institution: institutionFilter === 'all' ? undefined : institutionFilter,
         branch: branchFilter === 'all' ? undefined : branchFilter,
       }),
     [activeFilter, branchFilter, institutionFilter, roleFilter],
@@ -184,6 +184,7 @@ export function UsersManagementPage() {
     if (actorRole === 'super_admin' || actorRole === 'institution_admin') {
       return adminApi.institutions.list({ status: 'active' });
     }
+
     return Promise.resolve([] as Institution[]);
   }, [actorRole]);
 
@@ -191,16 +192,19 @@ export function UsersManagementPage() {
     if (actorRole === 'super_admin' || actorRole === 'institution_admin') {
       return adminApi.branches.list({ status: 'active' });
     }
+
     return Promise.resolve([] as Branch[]);
   }, [actorRole]);
 
   const { data, error, isLoading, reload } = useApiResource(loadUsers);
+
   const {
     data: institutionsData,
     error: institutionsError,
     isLoading: institutionsLoading,
     reload: reloadInstitutions,
   } = useApiResource(loadInstitutions);
+
   const {
     data: branchesData,
     error: branchesError,
@@ -209,6 +213,14 @@ export function UsersManagementPage() {
   } = useApiResource(loadBranches);
 
   const users = unwrapList(data);
+  const loadedInstitutions = unwrapList(institutionsData);
+  const loadedBranches = unwrapList(branchesData);
+
+  const institutions =
+    actorRole === 'branch_manager' ? institutionPlaceholder(user) : loadedInstitutions;
+
+  const branches = actorRole === 'branch_manager' ? branchPlaceholder(user) : loadedBranches;
+
   const filteredUsers = useMemo(
     () =>
       users.filter((candidate) => {
@@ -231,15 +243,6 @@ export function UsersManagementPage() {
       }),
     [debouncedSearch, users],
   );
-  const loadedInstitutions = unwrapList(institutionsData);
-  const loadedBranches = unwrapList(branchesData);
-
-  const institutions =
-    actorRole === 'branch_manager'
-      ? institutionPlaceholder(user)
-      : loadedInstitutions;
-  const branches =
-    actorRole === 'branch_manager' ? branchPlaceholder(user) : loadedBranches;
 
   const selectedUser =
     users.find((candidate) => String(candidate.id) === editingUserId) ?? null;
@@ -250,11 +253,14 @@ export function UsersManagementPage() {
         ? String(institutions[0].id)
         : ''
       : fixedInstitutionId;
+
   const resolvedInstitutionId = form.institution || defaultInstitutionId;
+
   const availableBranches = branches.filter((branch) => {
     if (!resolvedInstitutionId) return true;
     return branchInstitutionId(branch) === resolvedInstitutionId;
   });
+
   const defaultBranchId =
     actorRole === 'branch_manager'
       ? fixedBranchId
@@ -264,19 +270,21 @@ export function UsersManagementPage() {
 
   const canChooseInstitution =
     actorRole === 'super_admin' || actorRole === 'institution_admin';
+
   const canChooseBranch =
     actorRole === 'super_admin' || actorRole === 'institution_admin';
+
   const formId = 'user-form';
 
   const activeUsers = filteredUsers.filter(
     (candidate) => candidate.is_active !== false,
   ).length;
+
   const verifiedUsers = filteredUsers.filter(
     (candidate) => candidate.is_email_verified,
   ).length;
-  const staffUsers = filteredUsers.filter(
-    (candidate) => candidate.role !== 'client',
-  ).length;
+
+  const staffUsers = filteredUsers.filter((candidate) => candidate.role !== 'client').length;
 
   function canEditRecord(target: User) {
     return Boolean(user && target.id !== user.id);
@@ -285,9 +293,7 @@ export function UsersManagementPage() {
   function resetForm() {
     setEditingUserId(null);
     setFormError(null);
-    setForm(
-      createEmptyUserForm(defaultRole, defaultInstitutionId, defaultBranchId),
-    );
+    setForm(createEmptyUserForm(defaultRole, defaultInstitutionId, defaultBranchId));
   }
 
   function openCreateModal() {
@@ -311,11 +317,11 @@ export function UsersManagementPage() {
     {
       header: 'User',
       accessor: (row) => (
-        <div>
-          <p className="font-bold text-slate-900">
+        <div className="min-w-0">
+          <p className="truncate font-bold text-slate-900">
             {row.full_name || row.username || row.email}
           </p>
-          <p className="text-xs text-slate-500">{row.email}</p>
+          <p className="truncate text-xs text-slate-500">{row.email}</p>
         </div>
       ),
     },
@@ -336,10 +342,8 @@ export function UsersManagementPage() {
       header: 'Assignment',
       accessor: (row) => (
         <div>
-          <p>{row.institution_name || '-'}</p>
-          <p className="text-xs text-slate-500">
-            {row.branch_name || 'No branch'}
-          </p>
+          <p className="font-medium text-slate-800">{row.institution_name || '-'}</p>
+          <p className="text-xs text-slate-500">{row.branch_name || 'No branch'}</p>
         </div>
       ),
     },
@@ -380,9 +384,11 @@ export function UsersManagementPage() {
                     await adminApi.users.update(row.id, {
                       is_active: nextIsActive,
                     });
+
                     toast.success(
                       nextIsActive ? 'User activated' : 'User deactivated',
                     );
+
                     await reload();
                   } catch (toggleError) {
                     toast.error(
@@ -419,10 +425,7 @@ export function UsersManagementPage() {
     return <StateView title="Loading users..." />;
   }
 
-  if (
-    (institutionsLoading || branchesLoading) &&
-    actorRole !== 'branch_manager'
-  ) {
+  if ((institutionsLoading || branchesLoading) && actorRole !== 'branch_manager') {
     if (!institutionsData || !branchesData) {
       return <StateView title="Loading user management options..." />;
     }
@@ -439,11 +442,7 @@ export function UsersManagementPage() {
     );
   }
 
-  if (
-    institutionsError &&
-    actorRole !== 'branch_manager' &&
-    !institutionsData
-  ) {
+  if (institutionsError && actorRole !== 'branch_manager' && !institutionsData) {
     return (
       <StateView
         title="Could not load institutions"
@@ -489,9 +488,15 @@ export function UsersManagementPage() {
         },
       ]}
       filterPanel={
-        <Card className="grid gap-4">
-          <CardTitle>Search and filters</CardTitle>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <Card className="grid gap-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>Search and filters</CardTitle>
+            <p className="text-xs text-slate-500">
+              Narrow users by role, status, institution, or branch.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <Field label="Search">
               <Input
                 value={search}
@@ -499,6 +504,7 @@ export function UsersManagementPage() {
                 placeholder="Name, email, username, role, or branch"
               />
             </Field>
+
             <Field label="Role">
               <select
                 className={formSelectClassName}
@@ -513,6 +519,7 @@ export function UsersManagementPage() {
                 ))}
               </select>
             </Field>
+
             <Field label="Status">
               <select
                 className={formSelectClassName}
@@ -526,6 +533,7 @@ export function UsersManagementPage() {
                 ))}
               </select>
             </Field>
+
             {canChooseInstitution && institutions.length > 1 ? (
               <Field label="Institution">
                 <select
@@ -545,6 +553,7 @@ export function UsersManagementPage() {
                 </select>
               </Field>
             ) : null}
+
             {branches.length > 1 ? (
               <Field label="Branch">
                 <select
@@ -558,6 +567,7 @@ export function UsersManagementPage() {
                       if (institutionFilter === 'all' || !canChooseInstitution) {
                         return true;
                       }
+
                       return branchInstitutionId(branch) === institutionFilter;
                     })
                     .map((branch) => (
@@ -572,26 +582,28 @@ export function UsersManagementPage() {
         </Card>
       }
     >
-      <div className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
-        <RecordsListPanel
-          title="User directory"
-          description="Super admins manage everything, institution admins manage their institution, and branch managers manage only their branch teams."
-          action={
-            <Button type="button" onClick={openCreateModal}>
-              New user
-            </Button>
-          }
-        >
-          <div className="p-5">
-            <DataTable
-              data={filteredUsers}
-              columns={columns}
-              emptyTitle="No users found"
-              emptyMessage="Try widening the current search or account filters."
-            />
+      <RecordsListPanel
+        title="User directory"
+        description="Super admins manage everything, institution admins manage their institution, and branch managers manage only their branch teams."
+        action={
+          <Button type="button" onClick={openCreateModal}>
+            New user
+          </Button>
+        }
+      >
+        <div className="w-full overflow-hidden">
+          <div className="w-full overflow-x-auto p-3 sm:p-4 lg:p-5">
+            <div className="min-w-[900px]">
+              <DataTable
+                data={filteredUsers}
+                columns={columns}
+                emptyTitle="No users found"
+                emptyMessage="Try widening the current search or account filters."
+              />
+            </div>
           </div>
-        </RecordsListPanel>
-      </div>
+        </div>
+      </RecordsListPanel>
 
       {isFormOpen ? (
         <Modal
@@ -605,7 +617,7 @@ export function UsersManagementPage() {
               : 'Create a staff or client account within your management scope.'
           }
           footer={
-            <>
+            <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
@@ -615,11 +627,13 @@ export function UsersManagementPage() {
                     setForm(userFormFromRecord(selectedUser));
                     return;
                   }
+
                   resetForm();
                 }}
               >
                 {selectedUser ? 'Reset form' : 'Clear form'}
               </Button>
+
               <Button
                 type="button"
                 className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
@@ -627,6 +641,7 @@ export function UsersManagementPage() {
               >
                 Cancel
               </Button>
+
               <Button form={formId} type="submit" disabled={isSaving}>
                 {isSaving
                   ? 'Saving...'
@@ -634,27 +649,29 @@ export function UsersManagementPage() {
                     ? 'Save changes'
                     : 'Create user'}
               </Button>
-            </>
+            </div>
           }
         >
           <form
             id={formId}
-            className="grid gap-4"
+            className="grid max-h-[70vh] gap-4 overflow-y-auto pr-1"
             onSubmit={async (event) => {
               event.preventDefault();
+
               setIsSaving(true);
               setFormError(null);
 
               const chosenBranch = availableBranches.find(
                 (branch) => String(branch.id) === (form.branch || defaultBranchId),
               );
+
               const chosenInstitutionId =
                 form.institution ||
                 defaultInstitutionId ||
                 (chosenBranch ? branchInstitutionId(chosenBranch) : '');
+
               const chosenBranchId =
-                form.branch ||
-                (roleRequiresBranch(form.role) ? defaultBranchId : '');
+                form.branch || (roleRequiresBranch(form.role) ? defaultBranchId : '');
 
               const payload = {
                 email: form.email.trim(),
@@ -680,6 +697,7 @@ export function UsersManagementPage() {
                   : adminApi.users.create(payload));
 
                 toast.success(editingUserId ? 'User updated' : 'User created');
+
                 closeFormModal();
                 resetForm();
                 await reload();
@@ -692,7 +710,11 @@ export function UsersManagementPage() {
               }
             }}
           >
-            {formError ? <div className="alert alert-danger">{formError}</div> : null}
+            {formError ? (
+              <div className="alert alert-danger rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                {formError}
+              </div>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Email address">
@@ -774,10 +796,12 @@ export function UsersManagementPage() {
                   onChange={(event) =>
                     setForm((current) => {
                       const nextRole = event.target.value as Role;
+
                       const nextInstitution =
                         nextRole === 'super_admin'
                           ? ''
                           : current.institution || defaultInstitutionId;
+
                       const nextBranch = roleRequiresBranch(nextRole)
                         ? current.branch || defaultBranchId
                         : nextRole === 'client'
@@ -811,6 +835,7 @@ export function UsersManagementPage() {
                   onChange={(event) =>
                     setForm((current) => {
                       const nextInstitutionId = event.target.value;
+
                       const nextBranches = branches.filter((branch) => {
                         if (!nextInstitutionId) return true;
                         return branchInstitutionId(branch) === nextInstitutionId;
@@ -833,6 +858,7 @@ export function UsersManagementPage() {
                   {canChooseInstitution ? (
                     <option value="">Select an institution</option>
                   ) : null}
+
                   {institutions.map((institution) => (
                     <option key={institution.id} value={String(institution.id)}>
                       {institution.name}
@@ -862,6 +888,7 @@ export function UsersManagementPage() {
                       ? 'Select a branch'
                       : 'No branch assignment'}
                   </option>
+
                   {availableBranches.map((branch) => (
                     <option key={branch.id} value={String(branch.id)}>
                       {branch.name}

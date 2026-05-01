@@ -1,11 +1,13 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   Bell,
   Building2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -22,8 +24,9 @@ import {
   WalletCards,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { navItems } from '@/components/layout/nav-config';
+
 import { FinCoreLogo } from '@/components/brand/fincore-logo';
+import { navGroups } from '@/components/layout/nav-config';
 import { useAuth } from '@/features/auth/auth-provider';
 import { cn } from '@/lib/utils/cn';
 import type { Role } from '@/types/api';
@@ -48,11 +51,14 @@ const iconMap: Record<string, LucideIcon> = {
   '/loans/repayments': ListChecks,
   '/notifications': Bell,
   '/transactions': ReceiptText,
+  '/accounting/chart-of-accounts': Landmark,
+  '/accounting/journal-entries': ReceiptText,
   '/reports': BarChart3,
   '/reports/trial-balance': BarChart3,
-  '/reports/general-ledger': BarChart3,
-  '/reports/cashflow-statement': BarChart3,
-  '/reports/balance-sheet': BarChart3,
+  '/reports/profit-and-loss': BarChart3,
+  '/reports/general-ledger': FileText,
+  '/reports/cashflow-statement': ReceiptText,
+  '/reports/balance-sheet': Landmark,
   '/users': Users,
   '/audit-logs': FileText,
   '/settings': Settings,
@@ -69,11 +75,44 @@ export function Sidebar({
   const { user, logout } = useAuth();
   const role: Role | null = user?.role ?? null;
 
-  const visibleItems = navItems.filter((item) => {
-    if (!item.roles) return true;
-    if (!role) return false;
-    return item.roles.includes(role) && item.showInNavigation !== false;
-  });
+  const visibleGroups = useMemo(
+    () =>
+      navGroups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => {
+            if (item.showInNavigation === false) return false;
+            if (!item.roles) return true;
+            if (!role) return false;
+            return item.roles.includes(role);
+          }),
+        }))
+        .filter((group) => group.items.length > 0),
+    [role],
+  );
+
+  const defaultOpenGroups = useMemo(
+    () =>
+      visibleGroups
+        .filter((group) =>
+          group.items.some(
+            (item) =>
+              pathname === item.href || pathname.startsWith(`${item.href}/`),
+          ),
+        )
+        .map((group) => group.label),
+    [pathname, visibleGroups],
+  );
+
+  const [openGroups, setOpenGroups] = useState<string[]>(defaultOpenGroups);
+
+  function toggleGroup(label: string) {
+    setOpenGroups((current) =>
+      current.includes(label)
+        ? current.filter((item) => item !== label)
+        : [...current, label],
+    );
+  }
 
   return (
     <aside
@@ -109,32 +148,78 @@ export function Sidebar({
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-5">
-        {visibleItems.map((item) => {
-          const Icon = iconMap[item.href] ?? LayoutDashboard;
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+      <nav className="flex-1 overflow-y-auto px-3 py-5">
+        <div className="space-y-6">
+          {visibleGroups.map((group) => {
+            const isCollapsible = Boolean(group.collapsible) && !collapsed;
+            const isOpen =
+              !group.collapsible || collapsed || openGroups.includes(group.label);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              className={cn(
-                'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold transition',
-                collapsed && 'justify-center px-0',
-                active
-                  ? 'bg-[#127D61] text-white shadow-sm shadow-emerald-900/10'
-                  : 'text-slate-600 hover:bg-[#e8f5f1] hover:text-[#127D61]',
-              )}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {!collapsed ? (
-                <span className="truncate">{item.label}</span>
-              ) : null}
-            </Link>
-          );
-        })}
+            return (
+              <section key={group.label} className="space-y-2">
+                {!collapsed ? (
+                  isCollapsible ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.label)}
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400 transition hover:bg-slate-50 hover:text-[#127D61]"
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDown
+                        className={cn(
+                          'h-4 w-4 transition-transform',
+                          isOpen && 'rotate-180',
+                        )}
+                      />
+                    </button>
+                  ) : (
+                    <p className="px-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                      {group.label}
+                    </p>
+                  )
+                ) : null}
+
+                {isOpen ? (
+                  <div className="space-y-1">
+                    {group.items.map((item) => {
+                      const Icon = iconMap[item.href] ?? LayoutDashboard;
+                      const active =
+                        pathname === item.href ||
+                        pathname.startsWith(`${item.href}/`);
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          title={
+                            collapsed
+                              ? `${group.label} - ${item.label}`
+                              : undefined
+                          }
+                          className={cn(
+                            'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold transition',
+                            collapsed && 'justify-center px-0',
+                            group.collapsible &&
+                              !collapsed &&
+                              'ml-3 border-l border-slate-200 pl-4',
+                            active
+                              ? 'bg-[#127D61] text-white shadow-sm shadow-emerald-900/10'
+                              : 'text-slate-600 hover:bg-[#e8f5f1] hover:text-[#127D61]',
+                          )}
+                        >
+                          <Icon className="h-5 w-5 shrink-0" />
+                          {!collapsed ? (
+                            <span className="truncate">{item.label}</span>
+                          ) : null}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+        </div>
       </nav>
 
       <div className="border-t border-slate-200 p-3">
@@ -144,11 +229,12 @@ export function Sidebar({
               <p className="truncate text-sm font-black text-slate-900">
                 {user?.first_name || user?.username || 'FinCore user'}
               </p>
-              <p className="truncate text-xs font-semibold text-slate-500">
+              <p className="truncate text-xs font-semibold capitalize text-slate-500">
                 {String(user?.role ?? '').replaceAll('_', ' ')}
               </p>
             </div>
           ) : null}
+
           <button
             type="button"
             onClick={() => void logout()}

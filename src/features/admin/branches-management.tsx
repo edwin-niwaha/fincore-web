@@ -346,26 +346,34 @@ export function BranchesManagementPage() {
         </Card>
       }
     >
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-        <RecordsListPanel
-          title="Branch directory"
-          description="Branch actions are automatically scoped by your admin role."
-          action={
-            <Button type="button" className="whitespace-nowrap" onClick={openCreateModal}>
-              New branch
-            </Button>
-          }
-        >
-          <div className="p-5">
-            <DataTable
-              data={filteredBranches}
-              columns={columns}
-              emptyTitle="No branches found"
-              emptyMessage="Try widening the current filters or search terms."
-            />
-          </div>
-        </RecordsListPanel>
+<div className="w-full">
+  <RecordsListPanel
+    title="Branch directory"
+    description="Branch actions are automatically scoped by your admin role."
+    action={
+      <Button
+        type="button"
+        className="w-full sm:w-auto whitespace-nowrap"
+        onClick={openCreateModal}
+      >
+        New branch
+      </Button>
+    }
+  >
+    <div className="w-full overflow-hidden">
+      <div className="w-full overflow-x-auto p-3 sm:p-4 lg:p-5">
+        <div className="min-w-[850px]">
+          <DataTable
+            data={filteredBranches}
+            columns={columns}
+            emptyTitle="No branches found"
+            emptyMessage="Try widening the current filters or search terms."
+          />
+        </div>
       </div>
+    </div>
+  </RecordsListPanel>
+</div>
 
       {!availableInstitutions.length ? (
         <Card>

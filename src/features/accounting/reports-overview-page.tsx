@@ -38,14 +38,21 @@ function reportLinkDescription(path: string) {
   if (path.includes('trial-balance')) {
     return 'Review debits, credits, and balancing differences by ledger account.';
   }
+
   if (path.includes('general-ledger')) {
     return 'Drill into account activity with running balances and counterpart lines.';
   }
+
   if (path.includes('cashflow')) {
     return 'Track cash inflows, outflows, and branch-level movement for the period.';
   }
+
   if (path.includes('balance-sheet')) {
     return 'Review assets, liabilities, and equity with a balance check.';
+  }
+
+  if (path.includes('profit-and-loss')) {
+    return 'Review income, expenses, and net surplus or deficit for the selected period.';
   }
   return 'Open the report workspace.';
 }
@@ -68,50 +75,51 @@ export function ReportsOverviewPage() {
     reloadBranches,
   } = useReportScope(institutionFilter);
 
-  const resolvedInstitutionFilter =
-    canChooseInstitution ? institutionFilter : institutions[0]?.id ? String(institutions[0].id) : institutionFilter;
+  const resolvedInstitutionFilter = canChooseInstitution
+    ? institutionFilter
+    : institutions[0]?.id
+      ? String(institutions[0].id)
+      : institutionFilter;
+
   const resolvedBranchFilter =
     actorRole === 'branch_manager' && availableBranches[0]
       ? String(availableBranches[0].id)
       : branchFilter;
 
-  const loadSummarySnapshot = useCallback(
-    async () => {
-      const query = {
+  const loadSummarySnapshot = useCallback(async () => {
+    const query = {
+      institution:
+        resolvedInstitutionFilter === 'all'
+          ? undefined
+          : resolvedInstitutionFilter,
+      branch: resolvedBranchFilter === 'all' ? undefined : resolvedBranchFilter,
+      as_of: asOf || undefined,
+    };
+
+    const [trialBalance, savingsBalances, loanPortfolio] = await Promise.all([
+      accountingApi.reports.trialBalance(query),
+      accountingApi.reports.savingsBalances({
         institution:
           resolvedInstitutionFilter === 'all'
             ? undefined
             : resolvedInstitutionFilter,
         branch: resolvedBranchFilter === 'all' ? undefined : resolvedBranchFilter,
-        as_of: asOf || undefined,
-      };
+      }),
+      accountingApi.reports.loanPortfolio({
+        institution:
+          resolvedInstitutionFilter === 'all'
+            ? undefined
+            : resolvedInstitutionFilter,
+        branch: resolvedBranchFilter === 'all' ? undefined : resolvedBranchFilter,
+      }),
+    ]);
 
-      const [trialBalance, savingsBalances, loanPortfolio] = await Promise.all([
-        accountingApi.reports.trialBalance(query),
-        accountingApi.reports.savingsBalances({
-          institution:
-            resolvedInstitutionFilter === 'all'
-              ? undefined
-              : resolvedInstitutionFilter,
-          branch: resolvedBranchFilter === 'all' ? undefined : resolvedBranchFilter,
-        }),
-        accountingApi.reports.loanPortfolio({
-          institution:
-            resolvedInstitutionFilter === 'all'
-              ? undefined
-              : resolvedInstitutionFilter,
-          branch: resolvedBranchFilter === 'all' ? undefined : resolvedBranchFilter,
-        }),
-      ]);
-
-      return {
-        trialBalance,
-        savingsBalances,
-        loanPortfolio,
-      };
-    },
-    [asOf, resolvedBranchFilter, resolvedInstitutionFilter],
-  );
+    return {
+      trialBalance,
+      savingsBalances,
+      loanPortfolio,
+    };
+  }, [asOf, resolvedBranchFilter, resolvedInstitutionFilter]);
 
   const { data, error, isLoading, reload } =
     useApiResource<SummarySnapshot>(loadSummarySnapshot);
@@ -123,7 +131,10 @@ export function ReportsOverviewPage() {
 
   const topRows = useMemo(() => {
     return [...(data?.trialBalance.rows ?? [])]
-      .sort((a, b) => Math.abs(Number(b.balance ?? 0)) - Math.abs(Number(a.balance ?? 0)))
+      .sort(
+        (a, b) =>
+          Math.abs(Number(b.balance ?? 0)) - Math.abs(Number(a.balance ?? 0)),
+      )
       .slice(0, 6);
   }, [data?.trialBalance.rows]);
 
@@ -132,6 +143,38 @@ export function ReportsOverviewPage() {
     '/reports/general-ledger',
     '/reports/cashflow-statement',
     '/reports/balance-sheet',
+    '/reports/profit-and-loss',
+  ];
+
+  const summaryCards = [
+    {
+      label: 'Total assets',
+      value: moneyPrecise(balanceSheet.totalAssets),
+      note: 'From the live trial balance snapshot.',
+      tone: 'text-[#127D61]',
+    },
+    {
+      label: 'Savings liability',
+      value: moneyPrecise(data?.savingsBalances.total_balance),
+      note: `${data?.savingsBalances.accounts ?? 0} savings accounts in scope.`,
+      tone: 'text-[#127D61]',
+    },
+    {
+      label: 'Loan portfolio',
+      value: moneyPrecise(data?.loanPortfolio.principal_outstanding),
+      note: `${data?.loanPortfolio.loans ?? 0} loans, ${
+        data?.loanPortfolio.pending ?? 0
+      } pending.`,
+      tone: 'text-[#127D61]',
+    },
+    {
+      label: 'Balance difference',
+      value: moneyPrecise(balanceSheet.difference),
+      note: balanceSheet.isBalanced
+        ? 'Assets equal liabilities plus equity.'
+        : 'Review detailed reports to resolve the variance.',
+      tone: balanceSheet.isBalanced ? 'text-emerald-700' : 'text-rose-700',
+    },
   ];
 
   if (!canAccessAccountingReports(actorRole)) {
@@ -143,11 +186,18 @@ export function ReportsOverviewPage() {
     );
   }
 
-  if ((institutionsLoading || branchesLoading) && !institutions.length && !availableBranches.length) {
+  if (
+    (institutionsLoading || branchesLoading) &&
+    !institutions.length &&
+    !availableBranches.length
+  ) {
     return <StateView title="Loading report scope..." />;
   }
 
-  if ((institutionsError && !institutions.length) || (branchesError && !availableBranches.length)) {
+  if (
+    (institutionsError && !institutions.length) ||
+    (branchesError && !availableBranches.length)
+  ) {
     return (
       <StateView
         title="Could not load report filters"
@@ -177,34 +227,33 @@ export function ReportsOverviewPage() {
   }
 
   return (
-    <div className="container-fluid grid gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-2 sm:px-4 lg:px-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <PageHeader
           title="Summary report"
           description="A SACCO-ready overview of the accounting position, savings exposure, and loan portfolio for the selected reporting scope."
         />
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            className="btn-outline-secondary bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 print-hidden"
-            onClick={() => window.print()}
-          >
-            Print
-          </Button>
-        </div>
+
+        <Button
+          type="button"
+          className="btn-outline-secondary w-full bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 lg:w-auto print-hidden"
+          onClick={() => window.print()}
+        >
+          Print
+        </Button>
       </div>
 
-      <Card className="grid gap-4">
-        <div className="card-header rounded-t-2xl border-b border-slate-200 bg-slate-50/80 px-5 py-4">
-          <div>
-            <CardTitle>Reporting scope</CardTitle>
-            <p className="mt-1 text-sm text-slate-500">
-              Adjust the institution, branch, and reporting date before opening the detailed reports below.
-            </p>
-          </div>
+      <Card className="grid min-w-0 gap-4 overflow-hidden p-0">
+        <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
+          <CardTitle>Reporting scope</CardTitle>
+          <p className="mt-1 text-sm text-slate-500">
+            Adjust the institution, branch, and reporting date before opening
+            the detailed reports below.
+          </p>
         </div>
-        <div className="card-body grid gap-4 p-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+
+        <div className="grid gap-4 p-4 sm:p-5">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {canChooseInstitution ? (
               <Field label="Institution">
                 <select
@@ -247,7 +296,11 @@ export function ReportsOverviewPage() {
             </Field>
 
             <Field label="As of">
-              <Input type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
+              <Input
+                type="date"
+                value={asOf}
+                onChange={(event) => setAsOf(event.target.value)}
+              />
             </Field>
 
             <Field label="Generated">
@@ -255,153 +308,117 @@ export function ReportsOverviewPage() {
             </Field>
           </div>
 
-          <div className="alert alert-info">
+          <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-800">
             Scope date: <strong>{formatDate(asOf)}</strong>. Balance status:{' '}
             <strong>{balanceSheet.isBalanced ? 'Balanced' : 'Needs review'}</strong>.
           </div>
         </div>
       </Card>
 
-      <div className="row">
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card className="relative overflow-hidden bg-white/98">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {summaryCards.map((item) => (
+          <Card
+            key={item.label}
+            className="relative grid min-w-0 max-w-full gap-2 overflow-hidden bg-white/98 p-4"
+          >
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#127D61] via-emerald-400 to-transparent" />
-            <p className="text-sm font-semibold text-slate-500">Total assets</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(balanceSheet.totalAssets)}
+
+            <p className="truncate text-sm font-semibold text-slate-500">
+              {item.label}
             </p>
-            <p className="mt-2 text-sm text-slate-500">From the live trial balance snapshot.</p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card className="relative overflow-hidden bg-white/98">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#127D61] via-emerald-400 to-transparent" />
-            <p className="text-sm font-semibold text-slate-500">Savings liability</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(data?.savingsBalances.total_balance)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              {data?.savingsBalances.accounts ?? 0} savings accounts in scope.
-            </p>
-          </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card className="relative overflow-hidden bg-white/98">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#127D61] via-emerald-400 to-transparent" />
-            <p className="text-sm font-semibold text-slate-500">Loan portfolio</p>
-            <p className="mt-3 text-3xl font-black tracking-tight text-[#127D61]">
-              {moneyPrecise(data?.loanPortfolio.principal_outstanding)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              {data?.loanPortfolio.loans ?? 0} loans, {data?.loanPortfolio.pending ?? 0} pending.
+
+            <div className={`min-w-0 max-w-full ${item.tone}`}>
+              <p className="text-xs font-black uppercase tracking-wide">USh</p>
+              <p className="min-w-0 max-w-full overflow-hidden break-all text-[clamp(1rem,1.5vw,1.35rem)] font-black leading-tight tabular-nums">
+                {item.value.replace('USh', '').trim()}
+              </p>
+            </div>
+
+            <p className="text-sm leading-snug text-slate-500">
+              {item.note}
             </p>
           </Card>
-        </div>
-        <div className="col-12 col-md-6 col-xl-3">
-          <Card className="relative overflow-hidden bg-white/98">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#127D61] via-emerald-400 to-transparent" />
-            <p className="text-sm font-semibold text-slate-500">Balance difference</p>
-            <p
-              className={`mt-3 text-3xl font-black tracking-tight ${
-                balanceSheet.isBalanced ? 'text-emerald-700' : 'text-rose-700'
-              }`}
-            >
-              {moneyPrecise(balanceSheet.difference)}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              {balanceSheet.isBalanced
-                ? 'Assets equal liabilities plus equity.'
-                : 'Review detailed reports to resolve the variance.'}
-            </p>
-          </Card>
-        </div>
+        ))}
       </div>
 
-      <div className="row">
-        <div className="col-12 col-lg-8">
-          <Card className="overflow-hidden p-0">
-            <div className="card-header border-b border-slate-200 bg-slate-50/80 px-5 py-4">
-              <div>
-                <CardTitle>Report shortcuts</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
-                  Open each accounting report with the same branch-aware scope.
-                </p>
-              </div>
-            </div>
-            <div className="card-body grid gap-4 p-5 md:grid-cols-2">
-              {reportLinks.map((href) => (
-                <Link href={href} key={href}>
-                  <Card className="h-full transition hover:border-[#127D61] hover:bg-emerald-50/40">
-                    <CardTitle>{statusLabel(href.split('/').at(-1)?.replaceAll('-', ' '))}</CardTitle>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {reportLinkDescription(href)}
-                    </p>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        <div className="col-12 col-lg-4">
-          <Card className="overflow-hidden p-0">
-            <div className="card-header border-b border-slate-200 bg-slate-50/80 px-5 py-4">
-              <div>
-                <CardTitle>Balance check</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
-                  Quick view of the accounting control totals as of {formatDate(asOf)}.
-                </p>
-              </div>
-            </div>
-            <div className="card-body grid gap-3 p-5">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-slate-500">Assets</span>
-                <span className="font-bold text-slate-900">
-                  {moneyPrecise(balanceSheet.totalAssets)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-slate-500">Liabilities</span>
-                <span className="font-bold text-slate-900">
-                  {moneyPrecise(balanceSheet.totalLiabilities)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-slate-500">Equity</span>
-                <span className="font-bold text-slate-900">
-                  {moneyPrecise(balanceSheet.totalEquity)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-slate-500">Liabilities + equity</span>
-                <span className="font-bold text-slate-900">
-                  {moneyPrecise(balanceSheet.totalLiabilitiesAndEquity)}
-                </span>
-              </div>
-              <div
-                className={`alert ${
-                  balanceSheet.isBalanced ? 'alert-success' : 'alert-danger'
-                }`}
-              >
-                {balanceSheet.isBalanced
-                  ? 'The balance sheet is in balance for this reporting date.'
-                  : 'The balance sheet does not balance yet. Review detailed ledgers and postings.'}
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      <Card className="overflow-hidden p-0">
-        <div className="card-header border-b border-slate-200 bg-slate-50/80 px-5 py-4">
-          <div>
-            <CardTitle>Top balances in scope</CardTitle>
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[1.35fr_0.65fr]">
+        <Card className="min-w-0 overflow-hidden p-0">
+          <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
+            <CardTitle>Report shortcuts</CardTitle>
             <p className="mt-1 text-sm text-slate-500">
-              Largest balances from the trial balance to help branch and finance teams spot concentration quickly.
+              Open each accounting report with the same branch-aware scope.
             </p>
           </div>
+
+          <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-2">
+            {reportLinks.map((href) => (
+              <Link href={href} key={href} className="block min-w-0">
+                <Card className="h-full min-w-0 transition hover:border-[#127D61] hover:bg-emerald-50/40">
+                  <CardTitle className="break-words">
+                    {statusLabel(href.split('/').at(-1)?.replaceAll('-', ' '))}
+                  </CardTitle>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {reportLinkDescription(href)}
+                  </p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="min-w-0 overflow-hidden p-0">
+          <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
+            <CardTitle>Balance check</CardTitle>
+            <p className="mt-1 text-sm text-slate-500">
+              Quick view of the accounting control totals as of {formatDate(asOf)}.
+            </p>
+          </div>
+
+          <div className="grid gap-3 p-4 sm:p-5">
+            {[
+              ['Assets', balanceSheet.totalAssets],
+              ['Liabilities', balanceSheet.totalLiabilities],
+              ['Equity', balanceSheet.totalEquity],
+              ['Liabilities + equity', balanceSheet.totalLiabilitiesAndEquity],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                className="grid grid-cols-[1fr_auto] items-center gap-3 text-sm"
+              >
+                <span className="min-w-0 font-semibold text-slate-500">
+                  {label}
+                </span>
+                <span className="max-w-[150px] break-words text-right font-bold text-slate-900 tabular-nums">
+                  {moneyPrecise(value)}
+                </span>
+              </div>
+            ))}
+
+            <div
+              className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
+                balanceSheet.isBalanced
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-rose-50 text-rose-700'
+              }`}
+            >
+              {balanceSheet.isBalanced
+                ? 'The balance sheet is in balance for this reporting date.'
+                : 'The balance sheet does not balance yet. Review detailed ledgers and postings.'}
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="min-w-0 overflow-hidden p-0">
+        <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-4 sm:px-5">
+          <CardTitle>Top balances in scope</CardTitle>
+          <p className="mt-1 text-sm text-slate-500">
+            Largest balances from the trial balance to help branch and finance
+            teams spot concentration quickly.
+          </p>
         </div>
-        <div className="card-body p-5">
+
+        <div className="min-w-0 overflow-x-auto p-4 sm:p-5">
           <DataTable<TrialBalanceRow>
             data={topRows}
             loading={isLoading}
@@ -411,7 +428,7 @@ export function ReportsOverviewPage() {
               {
                 header: 'Account',
                 accessor: (row) => (
-                  <div>
+                  <div className="min-w-[180px]">
                     <p className="font-bold text-slate-900">{row.name}</p>
                     <p className="text-xs text-slate-500">{row.code}</p>
                   </div>
@@ -430,13 +447,15 @@ export function ReportsOverviewPage() {
             renderMobileCard={(row) => (
               <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-base font-bold text-slate-900">{row.name}</p>
+                  <div className="min-w-0">
+                    <p className="break-words text-base font-bold text-slate-900">
+                      {row.name}
+                    </p>
                     <p className="mt-1 text-sm text-slate-500">
                       {row.code} • {statusLabel(row.type)}
                     </p>
                   </div>
-                  <p className="text-sm font-bold text-slate-900">
+                  <p className="max-w-[140px] break-words text-right text-sm font-bold text-slate-900 tabular-nums">
                     {moneyPrecise(row.balance)}
                   </p>
                 </div>

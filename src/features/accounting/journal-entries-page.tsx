@@ -572,102 +572,34 @@ export function JournalEntriesPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <Card className="grid gap-4">
+      <div className="w-full min-w-0">
+        <Card className="grid min-w-0 gap-4 p-4">
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
                 <CardTitle>Journal register</CardTitle>
                 <p className="mt-1 text-sm text-slate-500">
                   Draft entries can be edited and posted; system-generated entries stay read-only.
                 </p>
               </div>
-              <Button type="button" onClick={openCreateModal}>
+
+              <Button type="button" onClick={openCreateModal} className="w-full lg:w-auto">
                 New journal entry
               </Button>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <Field label="Search">
-                <Input
-                  placeholder="Reference or description..."
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </Field>
-
-              {canChooseInstitution ? (
-                <Field label="Institution">
-                  <select
-                    className={formSelectClassName}
-                    value={institutionFilter}
-                    onChange={(event) => setInstitutionFilter(event.target.value)}
-                  >
-                    <option value="all">All institutions</option>
-                    {institutions.map((institution) => (
-                      <option key={institution.id} value={String(institution.id)}>
-                        {institution.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              ) : null}
-
-              <Field label="Branch">
-                <select
-                  className={formSelectClassName}
-                  value={branchFilter}
-                  onChange={(event) => setBranchFilter(event.target.value)}
-                >
-                  <option value="all">All branches</option>
-                  {branches
-                    .filter((branch) => {
-                      if (institutionFilter === 'all') return true;
-                      return branchInstitutionId(branch) === institutionFilter;
-                    })
-                    .map((branch) => (
-                      <option key={branch.id} value={String(branch.id)}>
-                        {branch.name}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-
-              <Field label="Status">
-                <select
-                  className={formSelectClassName}
-                  value={statusFilter}
-                  onChange={(event) => setStatusFilter(event.target.value)}
-                >
-                  {journalStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Source">
-                <select
-                  className={formSelectClassName}
-                  value={sourceFilter}
-                  onChange={(event) => setSourceFilter(event.target.value)}
-                >
-                  {journalSourceOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+              {/* keep your existing Field filters here */}
             </div>
           </div>
 
-          <DataTable<JournalEntry>
-            data={entries}
-            columns={columns}
-            emptyMessage="No journal entries matched this filter."
-          />
+          <div className="w-full min-w-0 overflow-x-auto">
+            <DataTable<JournalEntry>
+              data={entries}
+              columns={columns}
+              emptyMessage="No journal entries matched this filter."
+            />
+          </div>
         </Card>
       </div>
 

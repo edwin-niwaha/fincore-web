@@ -323,30 +323,55 @@ export function TrialBalancePage() {
         </div>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="p-4 min-w-0">
           <p className="text-sm font-semibold text-slate-500">Accounts</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">{rows.length}</p>
+
+          <div className="mt-2 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">#</span>
+            <p className="max-w-[120px] truncate text-right text-lg font-black tabular-nums text-slate-950">
+              {rows.length}
+            </p>
+          </div>
         </Card>
-        <Card>
+
+        <Card className="p-4 min-w-0">
           <p className="text-sm font-semibold text-slate-500">Total debits</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {moneyPrecise(data?.totals?.debit)}
-          </p>
+
+          <div className="mt-2 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-slate-950">
+              {moneyPrecise(data?.totals?.debit).replace('USh', '').trim()}
+            </p>
+          </div>
         </Card>
-        <Card>
+
+        <Card className="p-4 min-w-0">
           <p className="text-sm font-semibold text-slate-500">Total credits</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {moneyPrecise(data?.totals?.credit)}
-          </p>
+
+          <div className="mt-2 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p className="max-w-[140px] break-words text-right text-lg font-black tabular-nums text-slate-950">
+              {moneyPrecise(data?.totals?.credit).replace('USh', '').trim()}
+            </p>
+          </div>
         </Card>
-        <Card>
+
+        <Card className="p-4 min-w-0">
           <p className="text-sm font-semibold text-slate-500">Difference</p>
-          <p
-            className={`mt-2 text-3xl font-black ${Number(data?.totals?.difference ?? 0) === 0 ? 'text-emerald-700' : 'text-rose-700'}`}
-          >
-            {moneyPrecise(data?.totals?.difference)}
-          </p>
+
+          <div className="mt-2 flex items-end justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500">USh</span>
+            <p
+              className={`max-w-[140px] break-words text-right text-lg font-black tabular-nums ${
+                Number(data?.totals?.difference ?? 0) === 0
+                  ? 'text-emerald-700'
+                  : 'text-rose-700'
+              }`}
+            >
+              {moneyPrecise(data?.totals?.difference).replace('USh', '').trim()}
+            </p>
+          </div>
         </Card>
       </div>
 
