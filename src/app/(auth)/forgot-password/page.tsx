@@ -35,9 +35,7 @@ export default function ForgotPasswordPage() {
     try {
       const response = await authApi.forgotPassword(values.email);
 
-      toast.success(
-        response.detail || 'Reset code sent if that account exists.',
-      );
+      toast.success(response.detail || 'Reset code sent if that account exists.');
 
       router.push(`/reset-password?email=${encodeURIComponent(values.email)}`);
     } catch (error) {
@@ -52,7 +50,7 @@ export default function ForgotPasswordPage() {
     >
       <div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-white p-2 text-[#127D61] shadow-sm">
+          <div className="shrink-0 rounded-xl bg-white p-2 text-[#127D61] shadow-sm">
             <ShieldCheck className="h-5 w-5" />
           </div>
 
@@ -68,15 +66,18 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
 
-      <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+      <form className="grid gap-5" onSubmit={handleSubmit(onSubmit)}>
         <Field label="Email address" error={errors.email?.message}>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#127D61] focus-within:ring-2 focus-within:ring-[#127D61]/20">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-[#127D61]">
+              <Mail className="h-4 w-4" />
+            </div>
+
             <Input
               autoComplete="email"
               type="email"
               placeholder="you@example.com"
-              className="h-12 rounded-xl pl-10"
+              className="h-full flex-1 border-0 bg-transparent p-0 text-slate-900 shadow-none focus:outline-none focus:ring-0"
               {...register('email')}
             />
           </div>
@@ -84,14 +85,14 @@ export default function ForgotPasswordPage() {
 
         <Button
           disabled={isSubmitting}
-          className="h-12 w-full rounded-xl bg-[#127D61] font-bold text-white shadow-lg shadow-emerald-900/10 hover:bg-emerald-700"
+          className="h-12 w-full rounded-xl bg-[#127D61] text-base font-bold text-white shadow-lg shadow-emerald-900/10 transition hover:bg-[#0f6b53]"
         >
           {isSubmitting ? 'Sending code...' : 'Send reset code'}
         </Button>
       </form>
 
       <Link
-        className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-[#127D61] hover:text-emerald-700"
+        className="mt-6 flex items-center justify-center gap-2 text-sm font-bold text-[#127D61] transition hover:text-[#0f6b53] hover:underline"
         href="/login"
       >
         <ArrowLeft className="h-4 w-4" />
