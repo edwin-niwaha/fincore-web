@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState } from "react";
+import { Edit3, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { RecordsListPanel } from "@/components/records/records-list-panel";
 import { RecordsPageLayout } from "@/components/records/records-page-layout";
@@ -11,7 +13,6 @@ import type { Column } from "@/components/ui/data-table";
 import { DataTable } from "@/components/ui/data-table";
 import { Field, Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { RowActions } from "@/components/ui/row-actions";
 import { StateView } from "@/components/ui/state-view";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -222,6 +223,47 @@ function linkableUserLabel(user: ClientLinkableUser) {
   return `${identity} (${user.email})${branch}`;
 }
 
+function IconActionButton({
+  title,
+  onClick,
+  href,
+  disabled,
+  children,
+  tone = "text-slate-700 hover:bg-slate-100",
+}: {
+  title: string;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+  tone?: string;
+}) {
+  const className = `inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${tone} ${
+    disabled ? "cursor-not-allowed opacity-50" : ""
+  }`;
+
+  if (href) {
+    return (
+      <Link href={href} title={title} aria-label={title} className={className}>
+        {children}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={className}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function ClientsManagementPage() {
   const { user } = useAuth();
   const actorRole = user?.role ?? null;
@@ -429,30 +471,6 @@ export function ClientsManagementPage() {
       ),
     },
     {
-      header: "Contact",
-      accessor: (client) => (
-        <div>
-          <p className="font-medium text-slate-800">{client.phone ?? "-"}</p>
-          <p className="text-xs text-slate-500">
-            {clientPortalAccessLabel(client)}
-          </p>
-        </div>
-      ),
-    },
-    {
-      header: "Assignment",
-      accessor: (client) => (
-        <div>
-          <p className="font-medium text-slate-800">
-            {client.branch_name ?? "-"}
-          </p>
-          <p className="text-xs text-slate-500">
-            {client.institution_name ?? "No institution"}
-          </p>
-        </div>
-      ),
-    },
-    {
       header: "Status",
       accessor: (client) => <StatusBadge status={client.status} />,
     },
@@ -463,47 +481,50 @@ export function ClientsManagementPage() {
     {
       header: "Actions",
       accessor: (client) => (
-        <RowActions
-          actions={[
-            {
-              key: "view",
-              label: "View",
-              href: `/clients/${client.id}`,
-              tone: "success",
-            },
-            {
-              key: "edit",
-              label: "Edit",
-              onClick: () => openEditModal(client),
-            },
-            {
-              key: "delete",
-              label: "Delete",
-              disabled: isDeletingClientId === String(client.id),
-              tone: "danger",
-              onClick: async () => {
-                if (!window.confirm(`Delete ${fullName(client)}?`)) return;
+        <div className="flex items-center justify-end gap-1">
+          <IconActionButton
+            title="View client"
+            href={`/clients/${client.id}`}
+            tone="text-emerald-700 hover:bg-emerald-50"
+          >
+            <Eye className="h-4 w-4" />
+          </IconActionButton>
 
-                setIsDeletingClientId(String(client.id));
-                try {
-                  await clientsApi.remove(client.id);
-                  toast.success("Client deleted");
-                  if (editingClientId === String(client.id)) {
-                    resetForm();
-                  }
-                  await reload();
-                } catch (deleteError) {
-                  toast.error(
-                    getProblemMessage(deleteError, "Unable to delete client."),
-                  );
-                } finally {
-                  setIsDeletingClientId(null);
+          <IconActionButton
+            title="Edit client"
+            onClick={() => openEditModal(client)}
+            tone="text-blue-700 hover:bg-blue-50"
+          >
+            <Edit3 className="h-4 w-4" />
+          </IconActionButton>
+
+          <IconActionButton
+            title="Delete client"
+            disabled={isDeletingClientId === String(client.id)}
+            onClick={async () => {
+              if (!window.confirm(`Delete ${fullName(client)}?`)) return;
+
+              setIsDeletingClientId(String(client.id));
+              try {
+                await clientsApi.remove(client.id);
+                toast.success("Client deleted");
+                if (editingClientId === String(client.id)) {
+                  resetForm();
                 }
-              },
-            },
-          ]}
-          align="end"
-        />
+                await reload();
+              } catch (deleteError) {
+                toast.error(
+                  getProblemMessage(deleteError, "Unable to delete client."),
+                );
+              } finally {
+                setIsDeletingClientId(null);
+              }
+            }}
+            tone="text-rose-700 hover:bg-rose-50"
+          >
+            <Trash2 className="h-4 w-4" />
+          </IconActionButton>
+        </div>
       ),
       align: "right",
     },
@@ -608,7 +629,7 @@ export function ClientsManagementPage() {
   return (
     <RecordsPageLayout
       title="Clients"
-      description="Manage member records, branch assignment, and contact details from the live API."
+      description="Manage member records from a clean, responsive client directory."
       headerAction={
         <Button type="button" onClick={openCreateModal}>
           Add client
@@ -729,7 +750,7 @@ export function ClientsManagementPage() {
     >
       <RecordsListPanel
         title="Client directory"
-        description="A scan-friendly list with desktop table and mobile cards for branch teams in the field."
+        description="A minimal list with quick icon actions for viewing, editing, and deleting client records."
         action={
           <Button type="button" onClick={openCreateModal}>
             Register client
@@ -792,90 +813,67 @@ export function ClientsManagementPage() {
                         Member {client.member_number ?? client.member_no ?? client.id}
                       </p>
                     </div>
-                    <RowActions
-                      actions={[
-                        {
-                          key: "view",
-                          label: "View",
-                          href: `/clients/${client.id}`,
-                          tone: "success",
-                        },
-                        {
-                          key: "edit",
-                          label: "Edit",
-                          onClick: () => openEditModal(client),
-                        },
-                        {
-                          key: "delete",
-                          label: "Delete",
-                          disabled: isDeletingClientId === String(client.id),
-                          tone: "danger",
-                          onClick: async () => {
-                            if (!window.confirm(`Delete ${fullName(client)}?`)) {
-                              return;
-                            }
+                    <div className="flex shrink-0 items-center gap-1">
+                      <IconActionButton
+                        title="View client"
+                        href={`/clients/${client.id}`}
+                        tone="text-emerald-700 hover:bg-emerald-50"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </IconActionButton>
+                      <IconActionButton
+                        title="Edit client"
+                        onClick={() => openEditModal(client)}
+                        tone="text-blue-700 hover:bg-blue-50"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                      </IconActionButton>
+                      <IconActionButton
+                        title="Delete client"
+                        disabled={isDeletingClientId === String(client.id)}
+                        onClick={async () => {
+                          if (!window.confirm(`Delete ${fullName(client)}?`)) {
+                            return;
+                          }
 
-                            setIsDeletingClientId(String(client.id));
-                            try {
-                              await clientsApi.remove(client.id);
-                              toast.success("Client deleted");
-                              if (editingClientId === String(client.id)) {
-                                resetForm();
-                              }
-                              await reload();
-                            } catch (deleteError) {
-                              toast.error(
-                                getProblemMessage(
-                                  deleteError,
-                                  "Unable to delete client.",
-                                ),
-                              );
-                            } finally {
-                              setIsDeletingClientId(null);
+                          setIsDeletingClientId(String(client.id));
+                          try {
+                            await clientsApi.remove(client.id);
+                            toast.success("Client deleted");
+                            if (editingClientId === String(client.id)) {
+                              resetForm();
                             }
-                          },
-                        },
-                      ]}
-                      align="end"
-                    />
+                            await reload();
+                          } catch (deleteError) {
+                            toast.error(
+                              getProblemMessage(
+                                deleteError,
+                                "Unable to delete client.",
+                              ),
+                            );
+                          } finally {
+                            setIsDeletingClientId(null);
+                          }
+                        }}
+                        tone="text-rose-700 hover:bg-rose-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </IconActionButton>
+                    </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                        Contact
-                      </p>
-                      <p className="mt-1 font-medium text-slate-800">
-                        {client.phone ?? "-"}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {client.email || "No email address"}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                        Assignment
-                      </p>
-                      <p className="mt-1 font-medium text-slate-800">
-                        {client.branch_name ?? "-"}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {client.institution_name ?? "No institution"}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 sm:col-span-2">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                        Notes
-                      </p>
-                      <p className="mt-1 text-sm text-slate-700">
-                        {client.user
-                          ? `Portal access linked to ${clientPortalAccessLabel(client)}.`
-                          : "This record is currently managed only through staff workflows."}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Updated {formatDate(client.updated_at ?? client.created_at)}
-                      </p>
-                    </div>
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      Record
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {client.user
+                        ? `Portal access linked to ${clientPortalAccessLabel(client)}.`
+                        : "Staff-managed client record."}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Updated {formatDate(client.updated_at ?? client.created_at)}
+                    </p>
                   </div>
                 </article>
               )}

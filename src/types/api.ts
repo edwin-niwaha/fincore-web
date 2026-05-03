@@ -650,3 +650,56 @@ export type ApiProblem = {
   path?: string | null;
   details?: unknown;
 };
+
+export type ShareProduct = {
+  id: UUID;
+  institution: UUID;
+  institution_name?: string;
+  name: string;
+  code: string;
+  nominal_price: string | number;
+  minimum_shares?: number;
+  maximum_shares?: number | null;
+  allow_dividends?: boolean;
+  status?: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ShareAccount = {
+  id: UUID;
+  client: UUID;
+  client_name?: string;
+  client_member_number?: string;
+  product: UUID;
+  product_name?: string;
+  nominal_price?: string | number;
+  branch_name?: string;
+  institution_name?: string;
+  account_number?: string;
+  shares?: number;
+  total_value?: string | number;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ShareTransaction = {
+  id: UUID;
+  account: UUID;
+  account_number?: string;
+  client_name?: string;
+  product_name?: string;
+  type: string;
+  type_label?: string;
+  shares: number;
+  amount: string | number;
+  balance_after?: number;
+  reference: string;
+  performed_by?: UUID | null;
+  performed_by_email?: string | null;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+};

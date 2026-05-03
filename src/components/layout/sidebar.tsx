@@ -47,6 +47,7 @@ const iconMap: Record<string, LucideIcon> = {
   '/institutions': Landmark,
   '/branches': Building2,
   '/savings': WalletCards,
+  '/shares': WalletCards,
   '/loans/applications': ClipboardList,
   '/loans/repayments': ListChecks,
   '/notifications': Bell,

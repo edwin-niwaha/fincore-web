@@ -59,6 +59,7 @@ export const navGroups: NavGroup[] = [
     label: 'Operations',
     items: [
       { href: '/savings', label: 'Savings', roles: staffRoles },
+      { href: '/shares', label: 'Shares', roles: staffRoles },
       { href: '/loans/applications', label: 'Loan applications', roles: staffRoles },
       { href: '/loans/repayments', label: 'Repayments', roles: staffRoles },
       { href: '/notifications', label: 'Notifications', roles: staffRoles },

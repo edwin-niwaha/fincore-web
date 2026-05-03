@@ -29,6 +29,9 @@ import type {
   TrialBalanceReport,
   Transaction,
   User,
+  ShareProduct,
+  ShareAccount,
+  ShareTransaction,
 } from '@/types/api';
 
 type ListResponse<T> = T[] | PaginatedResponse<T>;
@@ -91,6 +94,28 @@ type SavingsOperationPayload = {
   reference: string;
   notes?: string;
 };
+type ShareProductWritePayload = {
+  institution: string | number;
+  name: string;
+  code: string;
+  nominal_price: string | number;
+  minimum_shares?: number;
+  maximum_shares?: number | null;
+  allow_dividends?: boolean;
+  status?: string;
+  description?: string;
+};
+type ShareAccountWritePayload = {
+  client: string | number;
+  product: string | number;
+  status?: string;
+};
+type ShareOperationPayload = {
+  shares: number;
+  reference: string;
+  notes?: string;
+};
+
 type LedgerAccountWritePayload = {
   institution: string | number;
   code: string;
@@ -381,6 +406,23 @@ export const savingsApi = {
   ),
 };
 
+export type StatementProfile = {
+  name: string;
+  logo_url: string;
+  postal_address: string;
+  physical_address: string;
+  phone: string;
+  email: string;
+  website: string;
+  statement_title: string;
+  currency: string;
+};
+
+export const institutionsApi = {
+  statementProfile: () =>
+    apiClient.get<StatementProfile>(endpoints.institutionStatementProfile),
+};
+
 export const adminApi = {
   institutions: createCrudResourceApi<Institution, InstitutionWritePayload>(
     endpoints.institutions,
@@ -414,6 +456,31 @@ export const clientsApi = {
 
   updateMe: (payload: ClientSelfServicePayload | FormData) =>
     apiClient.patch<ClientProfile>(endpoints.clientMe, payload),
+};
+
+export const sharesApi = {
+  products: createCrudResourceApi<ShareProduct, ShareProductWritePayload>(
+    endpoints.shareProducts,
+    endpoints.shareProductDetail,
+  ),
+  accounts: {
+    ...createCrudResourceApi<ShareAccount, ShareAccountWritePayload>(
+      endpoints.shareAccounts,
+      endpoints.shareAccountDetail,
+    ),
+    purchase: (id: string | number, payload: ShareOperationPayload) =>
+      apiClient.post<ShareTransaction>(endpoints.shareAccountPurchase(id), payload),
+    redeem: (id: string | number, payload: ShareOperationPayload) =>
+      apiClient.post<ShareTransaction>(endpoints.shareAccountRedeem(id), payload),
+    transactions: (id: string | number, query?: Query) =>
+      apiClient.get<ListResponse<ShareTransaction>>(
+        withQuery(endpoints.shareAccountTransactions(id), query),
+      ),
+  },
+  transactions: createResourceApi<ShareTransaction>(
+    endpoints.shareTransactions,
+    (id) => `/api/v1/shares/transactions/${id}/`,
+  ),
 };
 
 export const notificationsApi = {

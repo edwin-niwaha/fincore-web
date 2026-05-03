@@ -43,6 +43,7 @@ export const endpoints = {
   },
 
   institutions: '/api/v1/institutions/',
+  institutionStatementProfile: '/api/v1/institutions/statement-profile/',
   institutionDetail: (id: string | number) => `/api/v1/institutions/${id}/`,
   branches: '/api/v1/branches/',
   branchDetail: (id: string | number) => `/api/v1/branches/${id}/`,
@@ -104,4 +105,12 @@ export const endpoints = {
     `/api/v1/notifications/${id}/mark_read/`,
   notificationsMarkAllRead: '/api/v1/notifications/mark-all-read/',
   transactions: '/api/v1/transactions/',
+  shareProducts: '/api/v1/shares/products/',
+  shareProductDetail: (id: string | number) => `/api/v1/shares/products/${id}/`,
+  shareAccounts: '/api/v1/shares/accounts/',
+  shareAccountDetail: (id: string | number) => `/api/v1/shares/accounts/${id}/`,
+  shareAccountPurchase: (id: string | number) => `/api/v1/shares/accounts/${id}/purchase/`,
+  shareAccountRedeem: (id: string | number) => `/api/v1/shares/accounts/${id}/redeem/`,
+  shareAccountTransactions: (id: string | number) => `/api/v1/shares/accounts/${id}/transactions/`,
+  shareTransactions: '/api/v1/shares/transactions/',
 };
