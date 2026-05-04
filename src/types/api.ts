@@ -77,15 +77,34 @@ export type Client = {
   phone?: string;
   email?: string;
   national_id?: string;
+  passport_number?: string;
+  registration_number?: string;
   gender?: string;
   gender_display?: string;
   date_of_birth?: string | null;
+  joining_date?: string | null;
+  membership_type?: string;
+  membership_type_display?: string;
   address?: string;
   occupation?: string;
+  employer?: string;
   next_of_kin_name?: string;
   next_of_kin_phone?: string;
+  next_of_kin_relationship?: string;
+  profile_photo?: string | null;
+  profile_photo_url?: string | null;
   status?: string;
   kyc_status?: string;
+  kyc_status_display?: string;
+  kyc_level?: string;
+  kyc_level_display?: string;
+  risk_rating?: string;
+  risk_rating_display?: string;
+  is_watchlist_flagged?: boolean;
+  verification_comments?: string;
+  verified_by?: UUID | null;
+  verified_by_email?: string | null;
+  verified_at?: string | null;
   created_by?: UUID | null;
   created_by_email?: string | null;
   updated_by?: UUID | null;
@@ -134,6 +153,17 @@ export type ClientTransactionsSummary = {
   net_flow?: string | number;
 };
 
+export type ClientStatusHistory = {
+  id: UUID;
+  from_status?: string;
+  to_status?: string;
+  changed_by?: UUID | null;
+  changed_by_email?: string | null;
+  reason?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type ClientSavingsActivity = {
   id: UUID;
   account?: UUID | null;
@@ -169,6 +199,7 @@ export type ClientProfile = Client & {
   recent_savings_transactions?: ClientSavingsActivity[];
   recent_loans?: ClientLoanSnapshot[];
   recent_transactions?: Transaction[];
+  status_history?: ClientStatusHistory[];
 };
 
 export type Institution = {
@@ -178,6 +209,11 @@ export type Institution = {
   email?: string;
   phone?: string;
   currency?: string;
+  logo?: string | null;
+  postal_address?: string;
+  physical_address?: string;
+  website?: string;
+  statement_title?: string;
   status?: string;
   display_name?: string;
   branch_count?: number;
@@ -501,6 +537,18 @@ export type SavingsAccount = {
   updated_at?: string;
 };
 
+export type SavingsPolicy = {
+  id: UUID;
+  institution?: UUID | null;
+  institution_name?: string | null;
+  name?: string;
+  minimum_balance?: string | number;
+  withdrawal_charge?: string | number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type SavingsTransaction = {
   id: UUID;
   account?: UUID | null;
@@ -776,6 +824,47 @@ export type Notification = {
   data?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
+};
+
+export type AuditLog = {
+  id: UUID;
+  user?: UUID | null;
+  user_email?: string | null;
+  user_full_name?: string | null;
+  user_role?: string | null;
+  institution?: UUID | null;
+  institution_name?: string | null;
+  institution_code?: string | null;
+  branch?: UUID | null;
+  branch_name?: string | null;
+  branch_code?: string | null;
+  action: string;
+  module?: string;
+  resource?: string;
+  event?: string;
+  target?: string;
+  metadata?: Record<string, unknown>;
+  metadata_size?: number;
+  ip_address?: string | null;
+  request_path?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type AuditBreakdownRow = {
+  module?: string;
+  event?: string;
+  count: number;
+};
+
+export type AuditLogSummary = {
+  total_logs?: number;
+  today_logs?: number;
+  actors?: number;
+  modules?: number;
+  latest_activity_at?: string | null;
+  module_breakdown?: AuditBreakdownRow[];
+  event_breakdown?: AuditBreakdownRow[];
 };
 
 export type AdminDashboardSummary = {

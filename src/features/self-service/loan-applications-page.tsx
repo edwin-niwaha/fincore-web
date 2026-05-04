@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardTitle } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/input';
+import { LoanEligibilitySnapshotCard } from '@/components/ui/LoanEligibilitySnapshotCard';
 import { LoanStatusStepper } from '@/components/ui/LoanStatusStepper';
 import { Modal } from '@/components/ui/modal';
 import { StateView } from '@/components/ui/state-view';
@@ -257,6 +258,9 @@ export function SelfServiceLoanApplicationsPage() {
         : null;
 
   const latestAppraisal = selectedApplication?.appraisals?.[0] ?? null;
+  const actionRows = selectedApplication?.action_history ?? [];
+  const scheduleRows = selectedApplication?.schedule ?? [];
+  const repaymentRows = selectedApplication?.repayments ?? [];
   const currentEligibilitySignature = [
     applicationForm.product,
     applicationForm.amount,
@@ -757,7 +761,7 @@ export function SelfServiceLoanApplicationsPage() {
               </div>
 
               {selectedApplication.eligibility_snapshot ? (
-                <EligibilitySnapshotCard
+                <LoanEligibilitySnapshotCard
                   currency={currency}
                   snapshot={selectedApplication.eligibility_snapshot}
                   title="Eligibility snapshot"
@@ -827,6 +831,145 @@ export function SelfServiceLoanApplicationsPage() {
                       {latestAppraisal.notes}
                     </p>
                   ) : null}
+                </div>
+              ) : null}
+
+              {actionRows.length ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        Workflow history
+                      </p>
+                      <p className="mt-2 text-sm text-slate-600">
+                        Track how this application has moved through the approval process.
+                      </p>
+                    </div>
+                    <StatusBadge
+                      status={selectedApplication.status}
+                      label={`${actionRows.length} updates`}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    {actionRows.slice().reverse().map((action) => (
+                      <div
+                        key={action.id}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {statusLabel(action.action_label || action.action || 'update')}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {formatDate(action.created_at)}
+                              {action.acted_by_email ? ` by ${action.acted_by_email}` : ''}
+                            </p>
+                          </div>
+                          <StatusBadge
+                            status={action.to_status || selectedApplication.status}
+                          />
+                        </div>
+                        {action.comment ? (
+                          <p className="mt-3 text-sm leading-6 text-slate-700">
+                            {action.comment}
+                          </p>
+                        ) : null}
+                        {(action.from_status || action.to_status) ? (
+                          <p className="mt-2 text-xs text-slate-500">
+                            {statusLabel(action.from_status || 'pending')} to{' '}
+                            {statusLabel(action.to_status || selectedApplication.status)}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {(scheduleRows.length || repaymentRows.length) ? (
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      Repayment schedule preview
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Upcoming installments for this loan once disbursed.
+                    </p>
+
+                    <div className="mt-4 grid gap-3">
+                      {scheduleRows.slice(0, 5).map((row) => (
+                        <div
+                          key={row.id}
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                Due {formatDate(row.due_date)}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-500">
+                                Principal {currencyMoney(row.principal_due, currency, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{' '}
+                                | Interest{' '}
+                                {currencyMoney(row.interest_due, currency, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </p>
+                            </div>
+                            <StatusBadge
+                              status={row.is_paid ? 'active' : 'pending'}
+                              label={row.is_paid ? 'Paid' : 'Pending'}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      Repayment activity
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Recent repayments recorded against this loan.
+                    </p>
+
+                    <div className="mt-4 grid gap-3">
+                      {repaymentRows.length ? (
+                        repaymentRows.slice(0, 5).map((repayment) => (
+                          <div
+                            key={repayment.id}
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {currencyMoney(repayment.amount, currency, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </p>
+                                <p className="mt-1 text-sm text-slate-500">
+                                  {repayment.reference || 'No reference'} |{' '}
+                                  {formatDate(repayment.created_at || repayment.paid_at)}
+                                </p>
+                              </div>
+                              <StatusBadge status={repayment.status || 'posted'} />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-600">
+                          Repayments will appear here once collections start posting to this loan.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : null}
 
@@ -1096,7 +1239,7 @@ export function SelfServiceLoanApplicationsPage() {
             ) : null}
 
             {activeEligibilityPreview ? (
-              <EligibilitySnapshotCard
+              <LoanEligibilitySnapshotCard
                 currency={currency}
                 snapshot={activeEligibilityPreview}
                 title="Eligibility preview"
@@ -1197,94 +1340,6 @@ export function SelfServiceLoanApplicationsPage() {
           defaultCurrency={currency}
         />
       ) : null}
-    </div>
-  );
-}
-
-function EligibilitySnapshotCard({
-  currency,
-  snapshot,
-  title,
-  description,
-}: {
-  currency: string;
-  snapshot: LoanEligibilitySnapshot;
-  title: string;
-  description: string;
-}) {
-  const estimatedInstallment = currencyMoney(
-    snapshot.summary?.estimated_installment,
-    currency,
-    {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    },
-  );
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            {title}
-          </p>
-          <p className="mt-2 text-sm text-slate-600">{description}</p>
-        </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            snapshot.eligible
-              ? 'bg-emerald-100 text-emerald-800'
-              : 'bg-amber-100 text-amber-900'
-          }`}
-        >
-          {snapshot.eligible ? 'Eligible' : 'Needs review'}
-        </span>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <DetailMetric
-          label="Estimated installment"
-          value={estimatedInstallment}
-          helper="Largest expected installment from the schedule preview."
-        />
-        <DetailMetric
-          label="Savings balance"
-          value={currencyMoney(snapshot.summary?.savings_balance, currency, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
-          helper="Current savings balance used for the product checks."
-        />
-        <DetailMetric
-          label="Share capital"
-          value={currencyMoney(snapshot.summary?.share_capital, currency, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
-          helper="Current share capital used for the product checks."
-        />
-        <DetailMetric
-          label="Overdue loans"
-          value={String(snapshot.summary?.overdue_loans_count ?? 0)}
-          helper="Existing overdue loans in the current portfolio."
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {snapshot.checks.map((check) => (
-          <div
-            key={check.code}
-            className={`rounded-2xl border px-4 py-3 text-sm ${
-              check.passed
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                : 'border-rose-200 bg-rose-50 text-rose-900'
-            }`}
-          >
-            <p className="font-bold">{check.label || statusLabel(check.code)}</p>
-            <p className="mt-1 leading-6">{check.message}</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

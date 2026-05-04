@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { RecordsListPanel } from '@/components/records/records-list-panel';
 import { RecordsPageLayout } from '@/components/records/records-page-layout';
@@ -10,6 +11,7 @@ import { Card, CardTitle } from '@/components/ui/card';
 import type { Column } from '@/components/ui/data-table';
 import { DataTable } from '@/components/ui/data-table';
 import { Field, Input } from '@/components/ui/input';
+import { LoanEligibilitySnapshotCard } from '@/components/ui/LoanEligibilitySnapshotCard';
 import { LoanStatusStepper } from '@/components/ui/LoanStatusStepper';
 import { Modal } from '@/components/ui/modal';
 import { RowActions } from '@/components/ui/row-actions';
@@ -400,15 +402,19 @@ function loanStageMeta(status?: string | null) {
 }
 
 export function LoanApplicationsPage() {
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const actorRole = user?.role ?? null;
   const isClient = isClientRole(actorRole);
+  const initialSelectedLoanId = searchParams.get('loan');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('all');
   const [page, setPage] = useState(1);
-  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
+  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(
+    initialSelectedLoanId,
+  );
 
   const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
@@ -490,6 +496,15 @@ export function LoanApplicationsPage() {
   const products = unwrapList(productsData);
   const applications = unwrapList(applicationsData);
   const clientOptions = unwrapList(clientOptionsData);
+
+  useEffect(() => {
+    const nextSelectedLoanId = searchParams.get('loan');
+    if (nextSelectedLoanId && nextSelectedLoanId !== selectedLoanId) {
+      queueMicrotask(() => {
+        setSelectedLoanId(nextSelectedLoanId);
+      });
+    }
+  }, [searchParams, selectedLoanId]);
 
   const activeLoanId =
     selectedLoanId ?? (applications[0] ? String(applications[0].id) : null);
@@ -1367,58 +1382,12 @@ export function LoanApplicationsPage() {
                 </div>
 
                 {hasEligibilitySnapshot ? (
-                  <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-900">
-                          Eligibility snapshot
-                        </p>
-                        <p className="mt-1 break-words text-sm text-slate-500">
-                          Latest backend eligibility result for this request.
-                        </p>
-                      </div>
-                      <StatusBadge
-                        status={
-                          eligibilitySnapshot?.eligible
-                            ? 'active'
-                            : 'rejected'
-                        }
-                      />
-                    </div>
-
-                    <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
-                      {eligibilityChecks.map((check) => (
-                        <div
-                          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3"
-                          key={check.code}
-                        >
-                          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-                            <p className="min-w-0 flex-1 break-words font-semibold text-slate-900">
-                              {check.label ?? statusLabel(check.code)}
-                            </p>
-                            <StatusBadge
-                              status={check.passed ? 'active' : 'rejected'}
-                            />
-                          </div>
-                          <p className="mt-2 break-words text-sm text-slate-600">
-                            {check.message}
-                          </p>
-                          {(check.value != null || check.threshold != null) ? (
-                            <p className="mt-2 break-words text-xs text-slate-500">
-                              Value {check.value ?? '-'} | Threshold{' '}
-                              {check.threshold ?? '-'}
-                            </p>
-                          ) : null}
-                        </div>
-                      ))}
-                      {!eligibilityChecks.length ? (
-                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-600 md:col-span-2">
-                          No detailed eligibility checks were stored for this
-                          application yet.
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                  <LoanEligibilitySnapshotCard
+                    currency="UGX"
+                    snapshot={eligibilitySnapshot}
+                    title="Eligibility snapshot"
+                    description="Latest backend eligibility result for this request."
+                  />
                 ) : null}
 
                 <div className="flex flex-wrap gap-2">

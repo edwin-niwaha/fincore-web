@@ -5,7 +5,10 @@ export const organizationStatusOptions = [
   { value: 'active', label: 'Active' },
   { value: 'inactive', label: 'Inactive' },
   { value: 'pending', label: 'Pending' },
+  { value: 'suspended', label: 'Suspended' },
+  { value: 'rejected', label: 'Rejected' },
   { value: 'closed', label: 'Closed' },
+  { value: 'blacklisted', label: 'Blacklisted' },
 ] as const;
 
 export const activityFilterOptions = [
@@ -38,7 +41,7 @@ export function statusPillClassName(status?: string) {
   if (status === 'active') {
     return 'bg-emerald-100 text-emerald-800';
   }
-  if (['approved', 'paid', 'posted', 'completed', 'open'].includes(status ?? '')) {
+  if (['approved', 'paid', 'posted', 'completed', 'open', 'verified'].includes(status ?? '')) {
     return 'bg-emerald-100 text-emerald-800';
   }
   if (status === 'inactive') {
@@ -60,10 +63,17 @@ export function statusPillClassName(status?: string) {
   if (['recommended', 'disbursed'].includes(status ?? '')) {
     return 'bg-teal-100 text-teal-800';
   }
+  if (status === 'suspended') {
+    return 'bg-orange-100 text-orange-800';
+  }
   if (status === 'closed') {
     return 'bg-rose-100 text-rose-800';
   }
-  if (['rejected', 'failed', 'reversed', 'overdue', 'cancelled'].includes(status ?? '')) {
+  if (
+    ['rejected', 'failed', 'reversed', 'overdue', 'cancelled', 'blacklisted', 'expired'].includes(
+      status ?? '',
+    )
+  ) {
     return 'bg-rose-100 text-rose-800';
   }
   return 'bg-slate-100 text-slate-700';

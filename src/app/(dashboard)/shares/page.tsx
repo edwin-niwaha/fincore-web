@@ -1,5 +1,5 @@
-import { SharesPage } from '@/features/shares/shares-page';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <SharesPage />;
+  redirect('/shares/dashboard');
 }

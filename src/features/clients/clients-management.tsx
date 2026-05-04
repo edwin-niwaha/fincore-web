@@ -18,15 +18,20 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import {
   formSelectClassName,
   formatDate,
-  organizationStatusOptions,
 } from "@/features/admin/shared";
 import { useAuth } from "@/features/auth/auth-provider";
+import {
+  genderOptions,
+  getProblemMessage,
+  kycStatusOptions,
+  memberStatusOptions,
+  membershipTypeOptions,
+} from "@/features/clients/shared";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useApiResource } from "@/hooks/use-api-resource";
 import { isPaginatedResponse, listCount, unwrapList } from "@/lib/api/format";
 import { adminApi, clientsApi } from "@/lib/api/services";
 import type {
-  ApiProblem,
   Branch,
   Client,
   ClientLinkableUser,
@@ -42,36 +47,19 @@ type ClientFormState = {
   phone: string;
   email: string;
   national_id: string;
+  passport_number: string;
+  registration_number: string;
+  gender: string;
   date_of_birth: string;
+  joining_date: string;
+  membership_type: string;
   address: string;
   occupation: string;
+  employer: string;
   next_of_kin_name: string;
   next_of_kin_phone: string;
-  status: string;
+  next_of_kin_relationship: string;
 };
-
-function flattenErrorList(value: unknown): string | null {
-  if (Array.isArray(value)) return value.map(String).join(" ");
-  if (typeof value === "string") return value;
-  return null;
-}
-
-function getProblemMessage(
-  error: unknown,
-  fallback = "Unable to save client changes.",
-) {
-  const problem = error as ApiProblem;
-  if (problem?.message) return problem.message;
-
-  if (problem?.errors && typeof problem.errors === "object") {
-    const first = Object.values(problem.errors)
-      .map(flattenErrorList)
-      .find(Boolean);
-    if (first) return first;
-  }
-
-  return fallback;
-}
 
 function createEmptyClientForm(
   institutionId = "",
@@ -86,12 +74,18 @@ function createEmptyClientForm(
     phone: "",
     email: "",
     national_id: "",
+    passport_number: "",
+    registration_number: "",
+    gender: "",
     date_of_birth: "",
+    joining_date: "",
+    membership_type: "individual",
     address: "",
     occupation: "",
+    employer: "",
     next_of_kin_name: "",
     next_of_kin_phone: "",
-    status: "active",
+    next_of_kin_relationship: "",
   };
 }
 
@@ -105,12 +99,18 @@ function clientFormFromRecord(client: Client): ClientFormState {
     phone: client.phone ?? "",
     email: client.email ?? "",
     national_id: client.national_id ?? "",
+    passport_number: client.passport_number ?? "",
+    registration_number: client.registration_number ?? "",
+    gender: client.gender ?? "",
     date_of_birth: client.date_of_birth ?? "",
+    joining_date: client.joining_date ?? "",
+    membership_type: client.membership_type ?? "individual",
     address: client.address ?? "",
     occupation: client.occupation ?? "",
+    employer: client.employer ?? "",
     next_of_kin_name: client.next_of_kin_name ?? "",
     next_of_kin_phone: client.next_of_kin_phone ?? "",
-    status: client.status ?? "active",
+    next_of_kin_relationship: client.next_of_kin_relationship ?? "",
   };
 }
 
@@ -175,12 +175,18 @@ function buildClientPayload(
     phone: string;
     email: string;
     national_id: string;
+    passport_number: string;
+    registration_number: string;
+    gender: string;
     address: string;
     occupation: string;
+    employer: string;
     next_of_kin_name: string;
     next_of_kin_phone: string;
-    status: string;
+    next_of_kin_relationship: string;
     date_of_birth?: string;
+    joining_date?: string;
+    membership_type?: string;
   } = {
     user: form.user.trim() || null,
     institution: institutionId,
@@ -190,15 +196,24 @@ function buildClientPayload(
     phone: form.phone.trim(),
     email: form.email.trim(),
     national_id: form.national_id.trim(),
+    passport_number: form.passport_number.trim(),
+    registration_number: form.registration_number.trim(),
+    gender: form.gender,
     address: form.address.trim(),
     occupation: form.occupation.trim(),
+    employer: form.employer.trim(),
     next_of_kin_name: form.next_of_kin_name.trim(),
     next_of_kin_phone: form.next_of_kin_phone.trim(),
-    status: form.status,
+    next_of_kin_relationship: form.next_of_kin_relationship.trim(),
+    membership_type: form.membership_type,
   };
 
   if (form.date_of_birth.trim()) {
     payload.date_of_birth = form.date_of_birth.trim();
+  }
+
+  if (form.joining_date.trim()) {
+    payload.joining_date = form.joining_date.trim();
   }
 
   return payload;
@@ -208,8 +223,17 @@ function fullName(client: Client) {
   return (
     client.full_name ||
     `${client.first_name ?? ""} ${client.last_name ?? ""}`.trim() ||
-    "Unnamed client"
+    "Unnamed member"
   );
+}
+
+function clientIdentityLine(client: Client) {
+  if (client.national_id) return `National ID ${client.national_id}`;
+  if (client.passport_number) return `Passport ${client.passport_number}`;
+  if (client.registration_number) {
+    return `Registration ${client.registration_number}`;
+  }
+  return "No identity document on file";
 }
 
 function clientPortalAccessLabel(client: Client) {
@@ -272,6 +296,8 @@ export function ClientsManagementPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [kycFilter, setKycFilter] = useState("all");
+  const [membershipTypeFilter, setMembershipTypeFilter] = useState("all");
   const [institutionFilter, setInstitutionFilter] = useState("all");
   const [branchFilter, setBranchFilter] = useState("all");
   const [ordering, setOrdering] = useState("member_number");
@@ -296,6 +322,9 @@ export function ClientsManagementPage() {
       clientsApi.list({
         search: searchQuery || undefined,
         status: statusFilter === "all" ? undefined : statusFilter,
+        kyc_status: kycFilter === "all" ? undefined : kycFilter,
+        membership_type:
+          membershipTypeFilter === "all" ? undefined : membershipTypeFilter,
         institution:
           actorRole === "super_admin" && institutionFilter !== "all"
             ? institutionFilter
@@ -308,6 +337,8 @@ export function ClientsManagementPage() {
       actorRole,
       branchFilter,
       institutionFilter,
+      kycFilter,
+      membershipTypeFilter,
       ordering,
       page,
       searchQuery,
@@ -426,6 +457,12 @@ export function ClientsManagementPage() {
   const activeClients = clients.filter(
     (candidate) => candidate.status === "active",
   ).length;
+  const pendingClients = clients.filter(
+    (candidate) => candidate.status === "pending",
+  ).length;
+  const verifiedKycClients = clients.filter(
+    (candidate) => candidate.kyc_status === "verified",
+  ).length;
   const selfServiceClients = clients.filter(
     (candidate) => candidate.user,
   ).length;
@@ -452,9 +489,7 @@ export function ClientsManagementPage() {
             {client.member_number ?? client.member_no ?? client.id}
           </p>
           <p className="text-xs text-slate-500">
-            {client.national_id
-              ? `National ID ${client.national_id}`
-              : "No national ID on file"}
+            {clientIdentityLine(client)}
           </p>
         </div>
       ),
@@ -466,6 +501,35 @@ export function ClientsManagementPage() {
           <p className="font-bold text-slate-900">{fullName(client)}</p>
           <p className="text-xs text-slate-500">
             {client.email || "No email address"}
+          </p>
+        </div>
+      ),
+    },
+    {
+      header: "Membership",
+      accessor: (client) => (
+        <div>
+          <p className="font-bold text-slate-900">
+            {client.membership_type_display || "Individual"}
+          </p>
+          <p className="text-xs text-slate-500">
+            Joined {formatDate(client.joining_date ?? client.created_at)}
+          </p>
+        </div>
+      ),
+    },
+    {
+      header: "KYC",
+      accessor: (client) => (
+        <div className="grid gap-1">
+          <StatusBadge
+            status={client.kyc_status}
+            label={`KYC ${client.kyc_status_display || "Pending"}`}
+          />
+          <p className="text-xs text-slate-500">
+            {client.risk_rating_display
+              ? `${client.risk_rating_display} risk`
+              : "Risk not rated"}
           </p>
         </div>
       ),
@@ -483,7 +547,7 @@ export function ClientsManagementPage() {
       accessor: (client) => (
         <div className="flex items-center justify-end gap-1">
           <IconActionButton
-            title="View client"
+            title="View member"
             href={`/clients/${client.id}`}
             tone="text-emerald-700 hover:bg-emerald-50"
           >
@@ -491,7 +555,7 @@ export function ClientsManagementPage() {
           </IconActionButton>
 
           <IconActionButton
-            title="Edit client"
+            title="Edit member"
             onClick={() => openEditModal(client)}
             tone="text-blue-700 hover:bg-blue-50"
           >
@@ -499,7 +563,7 @@ export function ClientsManagementPage() {
           </IconActionButton>
 
           <IconActionButton
-            title="Delete client"
+            title="Delete member"
             disabled={isDeletingClientId === String(client.id)}
             onClick={async () => {
               if (!window.confirm(`Delete ${fullName(client)}?`)) return;
@@ -507,14 +571,14 @@ export function ClientsManagementPage() {
               setIsDeletingClientId(String(client.id));
               try {
                 await clientsApi.remove(client.id);
-                toast.success("Client deleted");
+                toast.success("Member deleted");
                 if (editingClientId === String(client.id)) {
                   resetForm();
                 }
                 await reload();
               } catch (deleteError) {
                 toast.error(
-                  getProblemMessage(deleteError, "Unable to delete client."),
+                  getProblemMessage(deleteError, "Unable to delete member."),
                 );
               } finally {
                 setIsDeletingClientId(null);
@@ -561,12 +625,12 @@ export function ClientsManagementPage() {
     const branchId = selectedBranchId || fixedBranchId;
 
     if (!institutionId) {
-      setFormError("Select an institution before saving the client.");
+      setFormError("Select an institution before saving the member.");
       return;
     }
 
     if (!branchId) {
-      setFormError("Select a branch before saving the client.");
+      setFormError("Select a branch before saving the member.");
       return;
     }
 
@@ -578,10 +642,10 @@ export function ClientsManagementPage() {
 
       if (editingClientId) {
         await clientsApi.update(editingClientId, payload);
-        toast.success("Client updated");
+        toast.success("Member updated");
       } else {
         await clientsApi.create(payload);
-        toast.success("Client created");
+        toast.success("Member created");
       }
 
       resetForm();
@@ -598,8 +662,8 @@ export function ClientsManagementPage() {
   if (!actorRole || actorRole === "client") {
     return (
       <StateView
-        title="Client management is not available"
-        description="Only staff users can create, edit, and review client records."
+        title="Member management is not available"
+        description="Only staff users can create, edit, and review member records."
       />
     );
   }
@@ -609,13 +673,13 @@ export function ClientsManagementPage() {
     (actorRole === "super_admin" || actorRole === "institution_admin") &&
     (!institutionsData || !branchesData)
   ) {
-    return <StateView title="Loading client form options..." />;
+    return <StateView title="Loading member form options..." />;
   }
 
   if (institutionsError || branchesError) {
     return (
       <StateView
-        title="Could not load client form options"
+        title="Could not load member form options"
         description={institutionsError || branchesError || undefined}
         actionLabel="Retry"
         onAction={() => {
@@ -628,38 +692,38 @@ export function ClientsManagementPage() {
 
   return (
     <RecordsPageLayout
-      title="Clients"
-      description="Manage member records from a clean, responsive client directory."
+      title="Members"
+      description="Manage member registration, lifecycle, and KYC-ready records from one responsive workspace."
       headerAction={
         <Button type="button" onClick={openCreateModal}>
-          Add client
+          Add member
         </Button>
       }
       metrics={[
         {
-          label: "Visible clients",
+          label: "Visible members",
           value: clients.length,
           hint: "Matching the current search and filters.",
         },
         {
-          label: "Active clients",
-          value: activeClients,
-          hint: "Currently marked active in this view.",
+          label: "Pending approval",
+          value: pendingClients,
+          hint: `${activeClients} active members in the current view.`,
         },
         {
-          label: "Self-service",
-          value: selfServiceClients,
-          hint: `Linked portal users across ${visibleBranches || 0} branches.`,
+          label: "KYC verified",
+          value: verifiedKycClients,
+          hint: `${selfServiceClients} linked portal users across ${visibleBranches || 0} branches.`,
           accent: "slate",
         },
       ]}
       filterPanel={
         <Card className="grid gap-4">
           <CardTitle>Search and filters</CardTitle>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
             <Field label="Search">
               <Input
-                placeholder="Member number, name, phone, or ID"
+                placeholder="Member number, name, phone, ID, passport, or registration"
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -677,7 +741,42 @@ export function ClientsManagementPage() {
                   setPage(1);
                 }}
               >
-                {organizationStatusOptions.map((option) => (
+                {memberStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="KYC">
+              <select
+                className={formSelectClassName}
+                value={kycFilter}
+                onChange={(event) => {
+                  setKycFilter(event.target.value);
+                  setPage(1);
+                }}
+              >
+                {kycStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Membership type">
+              <select
+                className={formSelectClassName}
+                value={membershipTypeFilter}
+                onChange={(event) => {
+                  setMembershipTypeFilter(event.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All member types</option>
+                {membershipTypeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -749,11 +848,11 @@ export function ClientsManagementPage() {
       }
     >
       <RecordsListPanel
-        title="Client directory"
-        description="A minimal list with quick icon actions for viewing, editing, and deleting client records."
+        title="Member register"
+        description="A clean register with quick access to member profiles, KYC state, and registration details."
         action={
           <Button type="button" onClick={openCreateModal}>
-            Register client
+            Register member
           </Button>
         }
         footer={
@@ -787,7 +886,7 @@ export function ClientsManagementPage() {
 
           {error && !data ? (
             <StateView
-              title="Could not load clients"
+              title="Could not load members"
               description={error}
               actionLabel="Retry"
               onAction={reload}
@@ -797,7 +896,7 @@ export function ClientsManagementPage() {
               data={clients}
               columns={clientColumns}
               loading={isLoading}
-              emptyTitle="No clients found"
+              emptyTitle="No members found"
               emptyMessage="Try widening the current search, branch, or status filter."
               renderMobileCard={(client) => (
                 <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
@@ -812,24 +911,27 @@ export function ClientsManagementPage() {
                       <p className="mt-1 text-sm font-semibold text-slate-600">
                         Member {client.member_number ?? client.member_no ?? client.id}
                       </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {client.membership_type_display || "Individual"} member
+                      </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <IconActionButton
-                        title="View client"
+                        title="View member"
                         href={`/clients/${client.id}`}
                         tone="text-emerald-700 hover:bg-emerald-50"
                       >
                         <Eye className="h-4 w-4" />
                       </IconActionButton>
                       <IconActionButton
-                        title="Edit client"
+                        title="Edit member"
                         onClick={() => openEditModal(client)}
                         tone="text-blue-700 hover:bg-blue-50"
                       >
                         <Edit3 className="h-4 w-4" />
                       </IconActionButton>
                       <IconActionButton
-                        title="Delete client"
+                        title="Delete member"
                         disabled={isDeletingClientId === String(client.id)}
                         onClick={async () => {
                           if (!window.confirm(`Delete ${fullName(client)}?`)) {
@@ -839,7 +941,7 @@ export function ClientsManagementPage() {
                           setIsDeletingClientId(String(client.id));
                           try {
                             await clientsApi.remove(client.id);
-                            toast.success("Client deleted");
+                            toast.success("Member deleted");
                             if (editingClientId === String(client.id)) {
                               resetForm();
                             }
@@ -848,7 +950,7 @@ export function ClientsManagementPage() {
                             toast.error(
                               getProblemMessage(
                                 deleteError,
-                                "Unable to delete client.",
+                                "Unable to delete member.",
                               ),
                             );
                           } finally {
@@ -871,6 +973,12 @@ export function ClientsManagementPage() {
                         ? `Portal access linked to ${clientPortalAccessLabel(client)}.`
                         : "Staff-managed client record."}
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <StatusBadge
+                        status={client.kyc_status}
+                        label={`KYC ${client.kyc_status_display || "Pending"}`}
+                      />
+                    </div>
                     <p className="mt-1 text-xs text-slate-500">
                       Updated {formatDate(client.updated_at ?? client.created_at)}
                     </p>
@@ -887,8 +995,8 @@ export function ClientsManagementPage() {
           open={isFormOpen}
           onClose={resetForm}
           size="xl"
-          title={editingClientId ? "Edit client" : "Register client"}
-          description="Capture identity, branch ownership, and next-of-kin details."
+          title={editingClientId ? "Edit member" : "Register member"}
+          description="Capture identity, branch ownership, and membership details. Lifecycle and KYC approval continue from the member profile."
           footer={
             <>
               <Button
@@ -902,41 +1010,120 @@ export function ClientsManagementPage() {
                 {isSaving
                   ? "Saving..."
                   : editingClientId
-                    ? "Update client"
-                    : "Create client"}
+                    ? "Update member"
+                    : "Create member"}
               </Button>
             </>
           }
         >
           <form className="grid gap-4" id={formId} onSubmit={handleSubmit}>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="First name">
-                    <Input
-                      value={form.first_name}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          first_name: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </Field>
-                  <Field label="Last name">
-                    <Input
-                      value={form.last_name}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          last_name: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </Field>
-                </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              New members default to <span className="font-bold text-slate-900">pending</span>.
+              Use the member profile to complete KYC verification, approval, suspension, or closure.
+            </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Identity and membership
+              </p>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="First name">
+                  <Input
+                    value={form.first_name}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        first_name: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </Field>
+                <Field label="Last name">
+                  <Input
+                    value={form.last_name}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        last_name: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </Field>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Field label="Membership type">
+                  <select
+                    className={formSelectClassName}
+                    value={form.membership_type}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        membership_type: event.target.value,
+                      }))
+                    }
+                  >
+                    {membershipTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Gender">
+                  <select
+                    className={formSelectClassName}
+                    value={form.gender}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        gender: event.target.value,
+                      }))
+                    }
+                  >
+                    {genderOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Date of birth">
+                  <Input
+                    type="date"
+                    value={form.date_of_birth}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        date_of_birth: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Joining date">
+                  <Input
+                    type="date"
+                    value={form.joining_date}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        joining_date: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Contact and ownership
+              </p>
+
+              <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Phone">
                     <Input
                       value={form.phone}
@@ -1079,7 +1266,7 @@ export function ClientsManagementPage() {
                     <p className="mt-1">
                       {selectedLinkedUser.email}
                       {selectedLinkedUser.branch_name
-                        ? ` • ${selectedLinkedUser.branch_name}`
+                        ? ` - ${selectedLinkedUser.branch_name}`
                         : ""}
                     </p>
                     <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
@@ -1089,111 +1276,133 @@ export function ClientsManagementPage() {
                     </p>
                   </div>
                 ) : null}
+            </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="National ID">
-                    <Input
-                      value={form.national_id}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          national_id: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Date of birth">
-                    <Input
-                      type="date"
-                      value={form.date_of_birth}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          date_of_birth: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                </div>
+            <div className="grid gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Identification and occupation
+              </p>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Occupation">
-                    <Input
-                      value={form.occupation}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          occupation: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Status">
-                    <select
-                      className={formSelectClassName}
-                      value={form.status}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          status: event.target.value,
-                        }))
-                      }
-                    >
-                      {organizationStatusOptions
-                        .filter((option) => option.value !== "all")
-                        .map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                    </select>
-                  </Field>
-                </div>
-
-                <Field label="Address">
+              <div className="grid gap-4 md:grid-cols-3">
+                <Field label="National ID">
                   <Input
-                    value={form.address}
+                    value={form.national_id}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        address: event.target.value,
+                        national_id: event.target.value,
                       }))
                     }
                   />
                 </Field>
+                <Field label="Passport number">
+                  <Input
+                    value={form.passport_number}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        passport_number: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Registration number">
+                  <Input
+                    value={form.registration_number}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        registration_number: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Next of kin name">
-                    <Input
-                      value={form.next_of_kin_name}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          next_of_kin_name: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                  <Field label="Next of kin phone">
-                    <Input
-                      value={form.next_of_kin_phone}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          next_of_kin_phone: event.target.value,
-                        }))
-                      }
-                    />
-                  </Field>
-                </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Occupation">
+                  <Input
+                    value={form.occupation}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        occupation: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Employer">
+                  <Input
+                    value={form.employer}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        employer: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
+            </div>
 
-                {formError ? (
-                  <div className="alert alert-danger">
-                    {formError}
-                  </div>
-                ) : null}
+            <Field label="Address">
+              <Input
+                value={form.address}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    address: event.target.value,
+                  }))
+                }
+              />
+            </Field>
 
-              </form>
+            <div className="grid gap-2">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                Next of kin
+              </p>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <Field label="Next of kin name">
+                  <Input
+                    value={form.next_of_kin_name}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        next_of_kin_name: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Next of kin phone">
+                  <Input
+                    value={form.next_of_kin_phone}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        next_of_kin_phone: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Relationship">
+                  <Input
+                    value={form.next_of_kin_relationship}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        next_of_kin_relationship: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {formError ? (
+              <div className="alert alert-danger">{formError}</div>
+            ) : null}
+          </form>
         </Modal>
       ) : null}
     </RecordsPageLayout>

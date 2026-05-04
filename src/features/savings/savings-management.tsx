@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowDownCircle,
@@ -273,16 +274,19 @@ function statementFileSafeName(value: unknown) {
 }
 
 export function SavingsManagementPage() {
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const actorRole = user?.role ?? null;
   const isClient = actorRole === "client";
   const canManageCash = Boolean(actorRole && cashRoles.includes(actorRole));
+  const initialSearch = searchParams.get("search") ?? "";
+  const initialSelectedAccountId = searchParams.get("account");
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
-    null,
+    initialSelectedAccountId,
   );
 
   const [transactionTypeFilter, setTransactionTypeFilter] = useState("all");
@@ -349,6 +353,24 @@ export function SavingsManagementPage() {
   const selectedAccount =
     accounts.find((candidate) => String(candidate.id) === selectedAccountId) ??
     null;
+
+  useEffect(() => {
+    const nextSearch = searchParams.get("search") ?? "";
+    const nextSelectedAccountId = searchParams.get("account");
+
+    if (nextSearch !== search) {
+      queueMicrotask(() => {
+        setSearch(nextSearch);
+        setPage(1);
+      });
+    }
+
+    if (nextSelectedAccountId && nextSelectedAccountId !== selectedAccountId) {
+      queueMicrotask(() => {
+        setSelectedAccountId(nextSelectedAccountId);
+      });
+    }
+  }, [search, searchParams, selectedAccountId]);
 
   useEffect(() => {
     if (!selectedAccountId) return;

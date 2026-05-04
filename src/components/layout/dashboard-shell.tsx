@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/protected-route';
+import {
+  visibleNavItemsForRole,
+} from '@/components/layout/nav-config';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
-import { navItems } from '@/components/layout/nav-config';
 import { useAuth } from '@/features/auth/auth-provider';
 import { cn } from '@/lib/utils/cn';
 
@@ -51,16 +53,11 @@ function MobileDashboardNav({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const role = user?.role ?? null;
+  const visibleItems = visibleNavItemsForRole(role);
 
   return (
     <nav className="grid gap-2">
-      {navItems
-        .filter(
-          (item) =>
-            item.showInNavigation !== false &&
-            (!item.roles || (role ? item.roles.includes(role) : false)),
-        )
-        .map((item) => {
+      {visibleItems.map((item) => {
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (

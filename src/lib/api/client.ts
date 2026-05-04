@@ -14,6 +14,21 @@ function buildUrl(path: string): string {
   return path.startsWith('http') ? path : `${env.apiBaseUrl}${path}`;
 }
 
+function isFormData(value: unknown): value is FormData {
+  return typeof FormData !== 'undefined' && value instanceof FormData;
+}
+
+function isBodyInitLike(value: unknown): value is BodyInit {
+  return (
+    typeof value === 'string' ||
+    value instanceof Blob ||
+    value instanceof ArrayBuffer ||
+    ArrayBuffer.isView(value) ||
+    value instanceof URLSearchParams ||
+    isFormData(value)
+  );
+}
+
 function isJsonResponse(res: Response): boolean {
   return res.headers.get('content-type')?.includes('application/json') ?? false;
 }
@@ -102,7 +117,11 @@ async function refreshAccessToken(): Promise<string | null> {
 function createHeaders(options: RequestOptions): Headers {
   const headers = new Headers(options.headers);
 
-  if (options.body !== undefined && !headers.has('Content-Type')) {
+  if (
+    options.body !== undefined &&
+    !headers.has('Content-Type') &&
+    !isFormData(options.body)
+  ) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -114,17 +133,42 @@ function createHeaders(options: RequestOptions): Headers {
   return headers;
 }
 
+function serializeBody(body: unknown) {
+  if (body === undefined) return undefined;
+  if (isBodyInitLike(body)) return body;
+  return JSON.stringify(body);
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
   const headers = createHeaders(options);
 
-  const res = await fetch(buildUrl(path), {
-    ...options,
-    headers,
-    cache: 'no-store',
-  });
+  let res: Response;
+
+  try {
+    res = await fetch(buildUrl(path), {
+      ...options,
+      headers,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'Network request failed.';
+
+    throw {
+      message:
+        message === 'Failed to fetch'
+          ? 'Unable to reach the API. Check that the backend is running and reachable.'
+          : message,
+      status: 0,
+      path,
+      details: error,
+    } satisfies ApiProblem;
+  }
 
   if (
     res.status === 401 &&
@@ -158,14 +202,14 @@ export const apiClient = {
     apiRequest<T>(path, {
       ...options,
       method: 'POST',
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: serializeBody(body),
     }),
 
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     apiRequest<T>(path, {
       ...options,
       method: 'PATCH',
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: serializeBody(body),
     }),
 
   delete: <T>(path: string, options?: RequestOptions) =>

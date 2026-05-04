@@ -4,13 +4,18 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  ArrowDownCircle,
+  ArrowRightLeft,
+  ArrowUpCircle,
   BarChart3,
   Bell,
+  BadgePercent,
   Building2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  CirclePlus,
   FileText,
   Home,
   Landmark,
@@ -26,12 +31,16 @@ import {
 import type { LucideIcon } from 'lucide-react';
 
 import { FinCoreLogo } from '@/components/brand/fincore-logo';
-import { navGroups } from '@/components/layout/nav-config';
+import {
+  findNavMatch,
+  visibleNavGroupsForRole,
+} from '@/components/layout/nav-config';
 import { useAuth } from '@/features/auth/auth-provider';
 import { cn } from '@/lib/utils/cn';
 import type { Role } from '@/types/api';
 
 const iconMap: Record<string, LucideIcon> = {
+  '/dashboard': Home,
   '/admin': ShieldCheck,
   '/staff': LayoutDashboard,
   '/client': Home,
@@ -48,6 +57,19 @@ const iconMap: Record<string, LucideIcon> = {
   '/branches': Building2,
   '/savings': WalletCards,
   '/shares': WalletCards,
+  '/shares/dashboard': LayoutDashboard,
+  '/shares/products': Building2,
+  '/shares/accounts': WalletCards,
+  '/shares/transactions': ReceiptText,
+  '/shares/purchase': ArrowUpCircle,
+  '/shares/additional': CirclePlus,
+  '/shares/transfers': ArrowRightLeft,
+  '/shares/redemption': ArrowDownCircle,
+  '/shares/dividends': BadgePercent,
+  '/shares/certificates': FileText,
+  '/shares/reports': BarChart3,
+  '/shares/approvals': ListChecks,
+  '/shares/settings': Settings,
   '/loans/products': Building2,
   '/loans/applications': ClipboardList,
   '/loans/repayments': ListChecks,
@@ -81,39 +103,26 @@ export function Sidebar({
   const { user, logout } = useAuth();
   const role: Role | null = user?.role ?? null;
 
-  const visibleGroups = useMemo(
-    () =>
-      navGroups
-        .map((group) => ({
-          ...group,
-          items: group.items.filter((item) => {
-            if (item.showInNavigation === false) return false;
-            if (!item.roles) return true;
-            if (!role) return false;
-            return item.roles.includes(role);
-          }),
-        }))
-        .filter((group) => group.items.length > 0),
-    [role],
-  );
+  const visibleGroups = useMemo(() => visibleNavGroupsForRole(role), [role]);
+
+  const activeHref = useMemo(() => {
+    return findNavMatch(pathname, role)?.item.href ?? null;
+  }, [pathname, role]);
 
   const defaultOpenGroups = useMemo(
     () =>
       visibleGroups
         .filter((group) =>
-          group.items.some(
-            (item) =>
-              pathname === item.href || pathname.startsWith(`${item.href}/`),
-          ),
+          group.items.some((item) => item.href === activeHref),
         )
         .map((group) => group.label),
-    [pathname, visibleGroups],
+    [activeHref, visibleGroups],
   );
 
-  const [openGroups, setOpenGroups] = useState<string[]>(defaultOpenGroups);
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   function toggleGroup(label: string) {
-    setOpenGroups((current) =>
+    setCollapsedGroups((current) =>
       current.includes(label)
         ? current.filter((item) => item !== label)
         : [...current, label],
@@ -159,7 +168,10 @@ export function Sidebar({
           {visibleGroups.map((group) => {
             const isCollapsible = Boolean(group.collapsible) && !collapsed;
             const isOpen =
-              !group.collapsible || collapsed || openGroups.includes(group.label);
+              !group.collapsible ||
+              collapsed ||
+              defaultOpenGroups.includes(group.label) ||
+              !collapsedGroups.includes(group.label);
 
             return (
               <section key={group.label} className="space-y-2">
@@ -189,9 +201,7 @@ export function Sidebar({
                   <div className="space-y-1">
                     {group.items.map((item) => {
                       const Icon = iconMap[item.href] ?? LayoutDashboard;
-                      const active =
-                        pathname === item.href ||
-                        pathname.startsWith(`${item.href}/`);
+                      const active = activeHref === item.href;
 
                       return (
                         <Link

@@ -2,9 +2,12 @@ import { apiClient } from '@/lib/api/client';
 import { endpoints } from '@/lib/api/endpoints';
 import type {
   AdminDashboardSummary,
+  AuditLog,
+  AuditLogSummary,
   Branch,
   Client,
   ClientDashboardSummary,
+  ClientStatusHistory,
   ClientLinkableUser,
   ClientProfile,
   Institution,
@@ -22,6 +25,7 @@ import type {
   Notification,
   PaginatedResponse,
   RepaymentScheduleRow,
+  SavingsPolicy,
   SavingsBalancesReport,
   SavingsAccount,
   SavingsTransaction,
@@ -47,6 +51,11 @@ type InstitutionWritePayload = {
   phone?: string;
   currency: string;
   status: string;
+  postal_address?: string;
+  physical_address?: string;
+  website?: string;
+  statement_title?: string;
+  logo?: File | null;
 };
 type BranchWritePayload = {
   institution: string | number;
@@ -76,12 +85,29 @@ type ClientWritePayload = {
   phone: string;
   email?: string;
   national_id?: string;
+  passport_number?: string;
+  registration_number?: string;
+  gender?: string;
   date_of_birth?: string;
+  joining_date?: string;
+  membership_type?: string;
   address?: string;
   occupation?: string;
+  employer?: string;
   next_of_kin_name?: string;
   next_of_kin_phone?: string;
-  status: string;
+  next_of_kin_relationship?: string;
+  status?: string;
+};
+type ClientStatusChangePayload = {
+  reason?: string;
+};
+type ClientKycVerificationPayload = {
+  kyc_status: string;
+  kyc_level?: string;
+  risk_rating?: string;
+  is_watchlist_flagged?: boolean;
+  verification_comments?: string;
 };
 export type ClientSelfServicePayload = {
   phone?: string;
@@ -325,7 +351,7 @@ function createResourceApi<T>(
   };
 }
 
-function createCrudResourceApi<T, TPayload extends Record<string, unknown>>(
+function createCrudResourceApi<T, TPayload>(
   basePath: string,
   detailPath: (id: string | number) => string,
 ) {
@@ -333,8 +359,9 @@ function createCrudResourceApi<T, TPayload extends Record<string, unknown>>(
     list: (query?: Query) =>
       apiClient.get<ListResponse<T>>(withQuery(basePath, query)),
     get: (id: string | number) => apiClient.get<T>(detailPath(id)),
-    create: (payload: TPayload) => apiClient.post<T>(basePath, payload),
-    update: (id: string | number, payload: Partial<TPayload>) =>
+    create: (payload: TPayload | FormData) =>
+      apiClient.post<T>(basePath, payload),
+    update: (id: string | number, payload: Partial<TPayload> | FormData) =>
       apiClient.patch<T>(detailPath(id), payload),
     remove: (id: string | number) => apiClient.delete<void>(detailPath(id)),
   };
@@ -459,6 +486,18 @@ export const savingsApi = {
     endpoints.savingsTransactions,
     (id) => `/api/v1/savings/transactions/${id}/`,
   ),
+  policy: {
+    get: (query?: Query) =>
+      apiClient.get<SavingsPolicy>(withQuery(endpoints.savingsPolicy, query)),
+    update: (
+      payload: Partial<Pick<SavingsPolicy, 'minimum_balance' | 'withdrawal_charge'>>,
+      query?: Query,
+    ) =>
+      apiClient.patch<SavingsPolicy>(
+        withQuery(endpoints.savingsPolicy, query),
+        payload,
+      ),
+  },
 };
 
 export type StatementProfile = {
@@ -493,6 +532,14 @@ export const adminApi = {
   ),
 };
 
+export const auditApi = {
+  logs: {
+    ...createResourceApi<AuditLog>(endpoints.auditLogs, endpoints.auditLogDetail),
+    summary: (query?: Query) =>
+      apiClient.get<AuditLogSummary>(withQuery(endpoints.auditLogsSummary, query)),
+  },
+};
+
 export const clientsApi = {
   ...createCrudResourceApi<Client, ClientWritePayload>(
     endpoints.clients,
@@ -507,6 +554,29 @@ export const clientsApi = {
   getProfile: (id: string | number) =>
     apiClient.get<ClientProfile>(endpoints.clientDetail(id)),
 
+  activate: (id: string | number) =>
+    apiClient.post<ClientProfile>(endpoints.clientActivate(id), {}),
+
+  deactivate: (id: string | number, payload?: ClientStatusChangePayload) =>
+    apiClient.post<ClientProfile>(endpoints.clientDeactivate(id), payload ?? {}),
+
+  suspend: (id: string | number, payload?: ClientStatusChangePayload) =>
+    apiClient.post<ClientProfile>(endpoints.clientSuspend(id), payload ?? {}),
+
+  reject: (id: string | number, payload?: ClientStatusChangePayload) =>
+    apiClient.post<ClientProfile>(endpoints.clientReject(id), payload ?? {}),
+
+  close: (id: string | number, payload?: ClientStatusChangePayload) =>
+    apiClient.post<ClientProfile>(endpoints.clientClose(id), payload ?? {}),
+
+  verifyKyc: (id: string | number, payload: ClientKycVerificationPayload) =>
+    apiClient.post<ClientProfile>(endpoints.clientVerifyKyc(id), payload),
+
+  statusHistory: (id: string | number, query?: Query) =>
+    apiClient.get<ListResponse<ClientStatusHistory>>(
+      withQuery(endpoints.clientStatusHistory(id), query),
+    ),
+
   me: () => apiClient.get<ClientProfile>(endpoints.clientMe),
 
   updateMe: (payload: ClientSelfServicePayload | FormData) =>
@@ -518,11 +588,15 @@ export const sharesApi = {
     endpoints.shareProducts,
     endpoints.shareProductDetail,
   ),
+  productsAll: (query?: Query) =>
+    listAllPages<ShareProduct>(withQuery(endpoints.shareProducts, query)),
   accounts: {
     ...createCrudResourceApi<ShareAccount, ShareAccountWritePayload>(
       endpoints.shareAccounts,
       endpoints.shareAccountDetail,
     ),
+    listAll: (query?: Query) =>
+      listAllPages<ShareAccount>(withQuery(endpoints.shareAccounts, query)),
     purchase: (id: string | number, payload: ShareOperationPayload) =>
       apiClient.post<ShareTransaction>(endpoints.shareAccountPurchase(id), payload),
     redeem: (id: string | number, payload: ShareOperationPayload) =>
@@ -536,6 +610,8 @@ export const sharesApi = {
     endpoints.shareTransactions,
     (id) => `/api/v1/shares/transactions/${id}/`,
   ),
+  transactionsAll: (query?: Query) =>
+    listAllPages<ShareTransaction>(withQuery(endpoints.shareTransactions, query)),
 };
 
 export const notificationsApi = {
@@ -589,12 +665,12 @@ export const selfServiceApi = {
       apiClient.get<LoanApplication>(endpoints.selfService.loanApplicationDetail(id)),
     eligibilityCheck: (payload: LoanEligibilityCheckPayload) =>
       apiClient.post<LoanEligibilitySnapshot>(
-        endpoints.loanApplicationEligibilityCheck,
+        endpoints.selfService.loanApplicationEligibilityCheck,
         payload,
       ),
     withdraw: (id: string | number, payload?: LoanDecisionPayload) =>
       apiClient.post<LoanApplication>(
-        endpoints.loanApplicationWithdraw(id),
+        endpoints.selfService.loanApplicationWithdraw(id),
         payload ?? {},
       ),
   },
