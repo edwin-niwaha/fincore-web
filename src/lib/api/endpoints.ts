@@ -66,6 +66,9 @@ export const endpoints = {
   reports: {
     savingsBalances: '/api/v1/reports/savings-balances/',
     loanPortfolio: '/api/v1/reports/loan-portfolio/',
+    loanDisbursements: '/api/v1/reports/loan-disbursements/',
+    loanCollections: '/api/v1/reports/loan-collections/',
+    loanArrearsAging: '/api/v1/reports/loan-arrears-aging/',
     trialBalance: '/api/v1/reports/trial-balance/',
     balanceSheet: '/api/v1/reports/balance-sheet/',
   },
@@ -80,16 +83,21 @@ export const endpoints = {
   savingsTransactions: '/api/v1/savings/transactions/',
   loanApplications: '/api/v1/loans/applications/',
   loanApplicationDetail: (id: string | number) => `/api/v1/loans/applications/${id}/`,
+  loanApplicationEligibilityCheck: '/api/v1/loans/applications/eligibility-check/',
   loanApplicationSubmit: (id: string | number) =>
     `/api/v1/loans/applications/${id}/submit/`,
   loanApplicationStartReview: (id: string | number) =>
     `/api/v1/loans/applications/${id}/start-review/`,
+  loanApplicationAppraise: (id: string | number) =>
+    `/api/v1/loans/applications/${id}/appraise/`,
   loanApplicationRecommend: (id: string | number) =>
     `/api/v1/loans/applications/${id}/recommend/`,
   loanApplicationApprove: (id: string | number) =>
     `/api/v1/loans/applications/${id}/approve/`,
   loanApplicationReject: (id: string | number) =>
     `/api/v1/loans/applications/${id}/reject/`,
+  loanApplicationWithdraw: (id: string | number) =>
+    `/api/v1/loans/applications/${id}/withdraw/`,
   loanApplicationDisburse: (id: string | number) =>
     `/api/v1/loans/applications/${id}/disburse/`,
   loanApplicationRepay: (id: string | number) =>

@@ -35,6 +35,22 @@ type SummarySnapshot = {
 };
 
 function reportLinkDescription(path: string) {
+  if (path.includes('loan-portfolio')) {
+    return 'Review the live loan book, outstanding balances, and portfolio-at-risk exposure.';
+  }
+
+  if (path.includes('loan-disbursements')) {
+    return 'Track released loans by date, method, product, and current outstanding balance.';
+  }
+
+  if (path.includes('loan-collections')) {
+    return 'Monitor principal and interest collections across branches and loan products.';
+  }
+
+  if (path.includes('loan-arrears-aging')) {
+    return 'Follow overdue loans using arrears buckets, days past due, and aged balances.';
+  }
+
   if (path.includes('trial-balance')) {
     return 'Review debits, credits, and balancing differences by ledger account.';
   }
@@ -139,6 +155,10 @@ export function ReportsOverviewPage() {
   }, [data?.trialBalance.rows]);
 
   const reportLinks = [
+    '/reports/loan-portfolio',
+    '/reports/loan-disbursements',
+    '/reports/loan-collections',
+    '/reports/loan-arrears-aging',
     '/reports/trial-balance',
     '/reports/general-ledger',
     '/reports/cashflow-statement',

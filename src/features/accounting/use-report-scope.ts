@@ -17,6 +17,20 @@ export function canAccessAccountingReports(role?: Role | null) {
   );
 }
 
+export function canAccessLoanReports(role?: Role | null) {
+  return Boolean(
+    role &&
+      [
+        'super_admin',
+        'institution_admin',
+        'branch_manager',
+        'loan_officer',
+        'accountant',
+        'teller',
+      ].includes(role),
+  );
+}
+
 function institutionPlaceholder(user: {
   institution?: string | number | null;
   institution_name?: string | null;

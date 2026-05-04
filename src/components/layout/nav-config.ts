@@ -60,10 +60,17 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: '/savings', label: 'Savings', roles: staffRoles },
       { href: '/shares', label: 'Shares', roles: staffRoles },
-      { href: '/loans/applications', label: 'Loan applications', roles: staffRoles },
-      { href: '/loans/repayments', label: 'Repayments', roles: staffRoles },
       { href: '/notifications', label: 'Notifications', roles: staffRoles },
       { href: '/transactions', label: 'Transactions', roles: staffRoles },
+    ],
+  },
+  {
+    label: 'Loans',
+    collapsible: true,
+    items: [
+      { href: '/loans/products', label: 'Loan products', roles: staffRoles },
+      { href: '/loans/applications', label: 'Applications', roles: staffRoles },
+      { href: '/loans/repayments', label: 'Repayments', roles: staffRoles },
     ],
   },
   {
@@ -79,6 +86,10 @@ export const navGroups: NavGroup[] = [
     collapsible: true,
     items: [
       { href: '/reports', label: 'Reports summary', roles: accountingRoles },
+      { href: '/reports/loan-portfolio', label: 'Loan portfolio', roles: staffRoles },
+      { href: '/reports/loan-disbursements', label: 'Loan disbursements', roles: staffRoles },
+      { href: '/reports/loan-collections', label: 'Loan collections', roles: staffRoles },
+      { href: '/reports/loan-arrears-aging', label: 'Loan arrears aging', roles: staffRoles },
       { href: '/reports/trial-balance', label: 'Trial balance', roles: accountingRoles },
       { href: '/reports/general-ledger', label: 'General ledger', roles: accountingRoles },
       { href: '/reports/cashflow-statement', label: 'Cashflow statement', roles: accountingRoles },

@@ -94,7 +94,15 @@ const transactionDateOptions = [
 ] as const;
 
 function todayDateInputValue() {
-  return new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function canProcessCashTransaction(account: SavingsAccount | null | undefined) {
+  return account?.status === "active";
 }
 
 function createEmptyAccountForm(): SavingsAccountFormState {
@@ -216,19 +224,24 @@ function IconActionButton({
   onClick,
   children,
   tone = "text-slate-700 hover:bg-slate-100",
+  disabled = false,
 }: {
   title: string;
   onClick: () => void;
   children: React.ReactNode;
   tone?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       title={title}
       aria-label={title}
-      onClick={onClick}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${tone}`}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+        disabled ? "cursor-not-allowed text-slate-300" : tone
+      }`}
     >
       {children}
     </button>
@@ -238,13 +251,6 @@ function IconActionButton({
 function escapeCsvValue(value: unknown) {
   const text = String(value ?? "");
   return `"${text.replace(/"/g, '""')}"`;
-}
-
-function escapePdfText(value: unknown) {
-  return String(value ?? "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
 }
 
 function escapeHtml(value: unknown) {
@@ -264,69 +270,6 @@ function statementFileSafeName(value: unknown) {
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "") || "statement"
   );
-}
-
-function buildSimplePdf(lines: string[]) {
-  const pageWidth = 595;
-  const pageHeight = 842;
-  const marginLeft = 40;
-  const top = 780;
-  const lineHeight = 15;
-  const maxLinesPerPage = Math.floor((top - 60) / lineHeight);
-  const chunks: string[][] = [];
-
-  for (let index = 0; index < lines.length; index += maxLinesPerPage) {
-    chunks.push(lines.slice(index, index + maxLinesPerPage));
-  }
-
-  const objects: string[] = [];
-  const pages: number[] = [];
-
-  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  objects.push("PAGES_PLACEHOLDER");
-  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-
-  chunks.forEach((chunk) => {
-    const contentLines = ["BT", "/F1 10 Tf", `${marginLeft} ${top} Td`];
-
-    chunk.forEach((line, lineIndex) => {
-      if (lineIndex > 0) contentLines.push(`0 -${lineHeight} Td`);
-      contentLines.push(`(${escapePdfText(line)}) Tj`);
-    });
-
-    contentLines.push("ET");
-    const stream = contentLines.join("\n");
-    const contentObjectNumber = objects.length + 1;
-    objects.push(
-      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
-    );
-
-    const pageObjectNumber = objects.length + 1;
-    pages.push(pageObjectNumber);
-    objects.push(
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectNumber} 0 R >>`,
-    );
-  });
-
-  objects[1] = `<< /Type /Pages /Kids [${pages.map((page) => `${page} 0 R`).join(" ")}] /Count ${pages.length} >>`;
-
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-
-  objects.forEach((object, index) => {
-    offsets.push(pdf.length);
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-
-  const xrefOffset = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n`;
-  pdf += "0000000000 65535 f \n";
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
-
-  return pdf;
 }
 
 export function SavingsManagementPage() {
@@ -365,6 +308,7 @@ export function SavingsManagementPage() {
   );
   const [operationError, setOperationError] = useState<string | null>(null);
   const [isSubmittingOperation, setIsSubmittingOperation] = useState(false);
+  const [isPreparingStatement, setIsPreparingStatement] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const debouncedClientSearch = useDebouncedValue(clientSearch.trim(), 300);
@@ -379,34 +323,28 @@ export function SavingsManagementPage() {
     [debouncedSearch, page, statusFilter],
   );
 
-const loadStatementProfile = useCallback(
-  () => institutionsApi.statementProfile(),
-  [],
-);
+  const loadStatementProfile = useCallback(
+    () => institutionsApi.statementProfile(),
+    [],
+  );
 
-const {
-  data: statementProfileData,
-  error: statementProfileError,
-  isLoading: statementProfileLoading,
-} = useApiResource(loadStatementProfile);
+  const { data: statementProfileData } = useApiResource(loadStatementProfile);
 
-console.log("profile", statementProfileData);
+  const companyStatementProfile = {
+    logoUrl: statementProfileData?.logo_url?.trim() || "/images/logo.png",
+    name: statementProfileData?.name?.trim() || "SACCO / COMPANY NAME",
+    postalAddress: statementProfileData?.postal_address?.trim() || "",
+    physicalAddress: statementProfileData?.physical_address?.trim() || "",
+    phone: statementProfileData?.phone?.trim() || "",
+    email: statementProfileData?.email?.trim() || "",
+    website: statementProfileData?.website?.trim() || "",
+    statementTitle:
+      statementProfileData?.statement_title?.trim() ||
+      "SAVINGS ACCOUNT STATEMENT",
+  };
 
-const companyStatementProfile = {
-  logoUrl: statementProfileData?.logo_url?.trim() || "/images/logo.png",
-  name: statementProfileData?.name?.trim() || "SACCO / COMPANY NAME",
-  postalAddress: statementProfileData?.postal_address?.trim() || "",
-  physicalAddress: statementProfileData?.physical_address?.trim() || "",
-  phone: statementProfileData?.phone?.trim() || "",
-  email: statementProfileData?.email?.trim() || "",
-  website: statementProfileData?.website?.trim() || "",
-  statementTitle:
-    statementProfileData?.statement_title?.trim() || "SAVINGS ACCOUNT STATEMENT",
-  currency: statementProfileData?.currency?.trim() || "UGX",
-};
-
-const { data, error, isLoading, reload } = useApiResource(loadAccounts);
-const accounts = unwrapList(data);
+  const { data, error, isLoading, reload } = useApiResource(loadAccounts);
+  const accounts = unwrapList(data);
 
   const selectedAccount =
     accounts.find((candidate) => String(candidate.id) === selectedAccountId) ??
@@ -420,9 +358,13 @@ const accounts = unwrapList(data);
     );
 
     if (!stillVisible) {
-      setSelectedAccountId(null);
-      setTransactionPage(1);
-      setIsStatementOpen(false);
+      queueMicrotask(() => {
+        setSelectedAccountId((current) =>
+          current === selectedAccountId ? null : current,
+        );
+        setTransactionPage(1);
+        setIsStatementOpen(false);
+      });
     }
   }, [accounts, selectedAccountId]);
 
@@ -572,16 +514,26 @@ const accounts = unwrapList(data);
           {canManageCash ? (
             <>
               <IconActionButton
-                title="Deposit"
+                title={
+                  canProcessCashTransaction(account)
+                    ? "Deposit"
+                    : "Deposits are available only for active accounts"
+                }
                 tone="text-blue-700 hover:bg-blue-50"
+                disabled={!canProcessCashTransaction(account)}
                 onClick={() => openOperationModal(account, "deposit")}
               >
                 <ArrowDownCircle className="h-4 w-4" />
               </IconActionButton>
 
               <IconActionButton
-                title="Withdraw"
+                title={
+                  canProcessCashTransaction(account)
+                    ? "Withdraw"
+                    : "Withdrawals are available only for active accounts"
+                }
                 tone="text-rose-700 hover:bg-rose-50"
+                disabled={!canProcessCashTransaction(account)}
                 onClick={() => openOperationModal(account, "withdrawal")}
               >
                 <ArrowUpCircle className="h-4 w-4" />
@@ -671,6 +623,14 @@ const accounts = unwrapList(data);
     accounts.find((candidate) => String(candidate.id) === operationAccountId) ??
     selectedAccount;
 
+  const buildStatementQuery = useCallback(
+    () => ({
+      type: transactionTypeFilter === "all" ? undefined : transactionTypeFilter,
+      ...buildDateFilter(transactionDateFilter),
+    }),
+    [transactionDateFilter, transactionTypeFilter],
+  );
+
   function openCreateAccountModal() {
     setAccountForm(createEmptyAccountForm());
     setAccountFormError(null);
@@ -706,6 +666,11 @@ const accounts = unwrapList(data);
     account: SavingsAccount,
     mode: Exclude<SavingsOperationMode, null>,
   ) {
+    if (!canProcessCashTransaction(account)) {
+      toast.error("Only active savings accounts can accept deposits or withdrawals.");
+      return;
+    }
+
     setSelectedAccountId(String(account.id));
     setTransactionPage(1);
     setOperationMode(mode);
@@ -714,7 +679,9 @@ const accounts = unwrapList(data);
     setOperationError(null);
   }
 
-  function buildStandardStatementHtml() {
+  function buildStandardStatementHtml(
+    statementTransactions: SavingsTransaction[],
+  ) {
     if (!selectedAccount) return "";
 
     const generatedAt = new Date().toLocaleString();
@@ -724,16 +691,16 @@ const accounts = unwrapList(data);
       selectedAccount.id;
     const client =
       selectedAccount.client_name ?? clientName(selectedAccount.client);
-    const rows = statementRows();
+    const rows = statementRows(statementTransactions);
 
-    const debitTotal = transactions.reduce((sum, transaction) => {
+    const debitTotal = statementTransactions.reduce((sum, transaction) => {
       const isDebit =
         transaction.type === "withdrawal" ||
         transaction.type === "withdrawal_charge";
       return isDebit ? sum + Number(transaction.amount ?? 0) : sum;
     }, 0);
 
-    const creditTotal = transactions.reduce((sum, transaction) => {
+    const creditTotal = statementTransactions.reduce((sum, transaction) => {
       return transaction.type === "deposit"
         ? sum + Number(transaction.amount ?? 0)
         : sum;
@@ -861,10 +828,18 @@ const accounts = unwrapList(data);
 </html>`;
   }
 
-  function openStandardStatementPdf() {
-    const html = buildStandardStatementHtml();
-    if (!html) return;
+  async function loadAllStatementTransactions() {
+    if (!selectedAccount) {
+      return [];
+    }
 
+    return savingsApi.accounts.transactionsAll(
+      selectedAccount.id,
+      buildStatementQuery(),
+    );
+  }
+
+  async function openStandardStatementPdf() {
     const printWindow = window.open("", "_blank", "width=1100,height=800");
     if (!printWindow) {
       toast.error("Allow pop-ups to download or print the PDF statement.");
@@ -872,14 +847,37 @@ const accounts = unwrapList(data);
     }
 
     printWindow.document.open();
-    printWindow.document.write(html);
+    printWindow.document.write("<p>Preparing savings statement...</p>");
     printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 400);
+
+    setIsPreparingStatement(true);
+    try {
+      const statementTransactions = await loadAllStatementTransactions();
+      const html = buildStandardStatementHtml(statementTransactions);
+      if (!html) {
+        printWindow.close();
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => printWindow.print(), 400);
+    } catch (statementError) {
+      printWindow.close();
+      const message = getProblemMessage(
+        statementError,
+        "Unable to prepare the savings statement.",
+      );
+      toast.error(message);
+    } finally {
+      setIsPreparingStatement(false);
+    }
   }
 
   function handlePrintStatement() {
-    openStandardStatementPdf();
+    void openStandardStatementPdf();
   }
 
   function selectAccount(accountId: string) {
@@ -904,8 +902,8 @@ const accounts = unwrapList(data);
     )}`;
   }
 
-  function statementRows() {
-    return transactions.map((transaction) => {
+  function statementRows(statementTransactions: SavingsTransaction[]) {
+    return statementTransactions.map((transaction) => {
       const isWithdrawalDebit =
         transaction.type === "withdrawal" ||
         transaction.type === "withdrawal_charge";
@@ -924,37 +922,49 @@ const accounts = unwrapList(data);
     });
   }
 
-  function handleDownloadStatement() {
+  async function handleDownloadStatement() {
     if (!selectedAccount) return;
 
-    const rows = [
-      [
-        "Date",
-        "Reference",
-        "Description",
-        "Type",
-        "Debit",
-        "Credit",
-        "Balance",
-      ],
-      ...statementRows(),
-    ];
+    setIsPreparingStatement(true);
+    try {
+      const statementTransactions = await loadAllStatementTransactions();
+      const rows = [
+        [
+          "Date",
+          "Reference",
+          "Description",
+          "Type",
+          "Debit",
+          "Credit",
+          "Balance",
+        ],
+        ...statementRows(statementTransactions),
+      ];
 
-    const csv = rows.map((row) => row.map(escapeCsvValue).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+      const csv = rows.map((row) => row.map(escapeCsvValue).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
 
-    link.href = url;
-    link.download = `${selectedAccountFileName()}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      link.href = url;
+      link.download = `${selectedAccountFileName()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (statementError) {
+      const message = getProblemMessage(
+        statementError,
+        "Unable to download the savings statement.",
+      );
+      toast.error(message);
+    } finally {
+      setIsPreparingStatement(false);
+    }
   }
 
   function handleDownloadPdfStatement() {
-    openStandardStatementPdf();
+    void openStandardStatementPdf();
   }
 
   async function handleCreateAccount(event: React.FormEvent<HTMLFormElement>) {
@@ -992,6 +1002,13 @@ const accounts = unwrapList(data);
     if (!operationMode || !operationTargetAccount) {
       setOperationError(
         "Select a savings account before recording a transaction.",
+      );
+      return;
+    }
+
+    if (!canProcessCashTransaction(operationTargetAccount)) {
+      setOperationError(
+        "Only active savings accounts can accept deposits or withdrawals.",
       );
       return;
     }
@@ -1234,8 +1251,13 @@ const accounts = unwrapList(data);
                           {canManageCash ? (
                             <>
                               <IconActionButton
-                                title="Deposit"
+                                title={
+                                  canProcessCashTransaction(account)
+                                    ? "Deposit"
+                                    : "Deposits are available only for active accounts"
+                                }
                                 tone="text-blue-700 hover:bg-blue-50"
+                                disabled={!canProcessCashTransaction(account)}
                                 onClick={() =>
                                   openOperationModal(account, "deposit")
                                 }
@@ -1244,8 +1266,13 @@ const accounts = unwrapList(data);
                               </IconActionButton>
 
                               <IconActionButton
-                                title="Withdraw"
+                                title={
+                                  canProcessCashTransaction(account)
+                                    ? "Withdraw"
+                                    : "Withdrawals are available only for active accounts"
+                                }
                                 tone="text-rose-700 hover:bg-rose-50"
+                                disabled={!canProcessCashTransaction(account)}
                                 onClick={() =>
                                   openOperationModal(account, "withdrawal")
                                 }
@@ -1408,19 +1435,25 @@ const accounts = unwrapList(data);
                   type="button"
                   className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
                   onClick={handlePrintStatement}
+                  disabled={isPreparingStatement}
                 >
                   <Printer className="mr-2 h-4 w-4" />
-                  Print
+                  {isPreparingStatement ? "Preparing..." : "Print"}
                 </Button>
                 <Button
                   type="button"
                   className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
                   onClick={handleDownloadPdfStatement}
+                  disabled={isPreparingStatement}
                 >
                   <FileText className="mr-2 h-4 w-4" />
                   PDF
                 </Button>
-                <Button type="button" onClick={handleDownloadStatement}>
+                <Button
+                  type="button"
+                  onClick={() => void handleDownloadStatement()}
+                  disabled={isPreparingStatement}
+                >
                   <Download className="mr-2 h-4 w-4" />
                   CSV
                 </Button>
@@ -1673,7 +1706,10 @@ const accounts = unwrapList(data);
                   }
                 >
                   {savingsStatusOptions
-                    .filter((option) => option.value !== "all")
+                    .filter(
+                      (option) =>
+                        option.value !== "all" && option.value !== "closed",
+                    )
                     .map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}

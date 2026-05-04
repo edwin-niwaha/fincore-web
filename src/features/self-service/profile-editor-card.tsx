@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -98,9 +99,12 @@ export function SelfServiceProfileEditorCard({
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center">
         <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-4 border-white bg-slate-200 shadow-sm">
           {avatarPreviewUrl ? (
-            <img
+            <Image
               src={avatarPreviewUrl}
               alt="Profile preview"
+              width={96}
+              height={96}
+              unoptimized
               className="h-full w-full object-cover"
             />
           ) : (

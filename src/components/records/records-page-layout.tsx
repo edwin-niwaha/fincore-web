@@ -40,17 +40,17 @@ export function RecordsPageLayout({
   className?: string;
 }) {
   return (
-    <div className={cn('container-fluid grid gap-6', className)}>
+    <div className={cn('container-fluid grid min-w-0 gap-6', className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <PageHeader title={title} description={description} />
         {headerAction}
       </div>
 
       {metrics?.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {metrics.map((metric) => (
             <Card
-              className="relative overflow-hidden bg-white/95"
+              className="relative min-w-0 overflow-hidden bg-white/95"
               key={metric.label}
             >
               <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#127D61] via-emerald-400 to-transparent" />

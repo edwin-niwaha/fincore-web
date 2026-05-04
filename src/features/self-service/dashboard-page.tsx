@@ -200,7 +200,7 @@ export function SelfServiceDashboardPage() {
             columns={[
               {
                 header: 'Date',
-                accessor: (row) => formatDate(row.created_at),
+                accessor: (row) => formatDate(row.transaction_date || row.created_at),
               },
               {
                 header: 'Reference',

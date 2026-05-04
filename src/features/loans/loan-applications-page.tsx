@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { RecordsListPanel } from '@/components/records/records-list-panel';
 import { RecordsPageLayout } from '@/components/records/records-page-layout';
@@ -36,6 +36,7 @@ import type {
   Client,
   LoanApplication,
   LoanApplicationAction,
+  LoanAppraisal,
   LoanProduct,
   LoanRepayment,
   RepaymentScheduleRow,
@@ -68,14 +69,17 @@ type ApplicationFormState = {
   amount: string;
   term_months: string;
   purpose: string;
+  repayment_source: string;
   submit_mode: 'draft' | 'submitted';
 };
 
 type DecisionMode =
   | 'start_review'
+  | 'appraise'
   | 'recommend'
   | 'approve'
   | 'reject'
+  | 'withdraw'
   | 'disburse'
   | null;
 
@@ -84,6 +88,17 @@ type DecisionFormState = {
   reason: string;
   reference: string;
   disbursement_method: string;
+  recommendation: string;
+  recommended_amount: string;
+  recommended_term_months: string;
+  monthly_income: string;
+  monthly_expenses: string;
+  existing_debt_payments: string;
+  risk_score: string;
+  collateral_notes: string;
+  guarantor_notes: string;
+  credit_comments: string;
+  notes: string;
 };
 
 type RepaymentFormState = {
@@ -99,6 +114,7 @@ function createEmptyApplicationForm(): ApplicationFormState {
     amount: '',
     term_months: '',
     purpose: '',
+    repayment_source: 'other',
     submit_mode: 'submitted',
   };
 }
@@ -109,6 +125,17 @@ function createEmptyDecisionForm(): DecisionFormState {
     reason: '',
     reference: '',
     disbursement_method: 'cash',
+    recommendation: 'approve',
+    recommended_amount: '',
+    recommended_term_months: '',
+    monthly_income: '',
+    monthly_expenses: '0',
+    existing_debt_payments: '0',
+    risk_score: '',
+    collateral_notes: '',
+    guarantor_notes: '',
+    credit_comments: '',
+    notes: '',
   };
 }
 
@@ -164,16 +191,36 @@ function canRecommend(role?: Role | null, loan?: LoanApplication | null) {
     : false;
 }
 
+function canAppraise(role?: Role | null, loan?: LoanApplication | null) {
+  return role && loan
+    ? loanOfficerRoles.includes(role) &&
+        ['submitted', 'under_review', 'appraised'].includes(loan.status)
+    : false;
+}
+
 function canApprove(role?: Role | null, loan?: LoanApplication | null) {
   return role && loan
-    ? approverRoles.includes(role) && loan.status === 'recommended'
+    ? approverRoles.includes(role) &&
+        ['recommended', 'appraised'].includes(loan.status)
     : false;
 }
 
 function canReject(role?: Role | null, loan?: LoanApplication | null) {
   return role && loan
     ? [...loanOfficerRoles, ...approverRoles].includes(role) &&
-        ['submitted', 'under_review', 'recommended'].includes(loan.status)
+        ['submitted', 'under_review', 'appraised', 'recommended'].includes(
+          loan.status,
+        )
+    : false;
+}
+
+function canWithdraw(role?: Role | null, loan?: LoanApplication | null) {
+  return role && loan
+    ? (isClientRole(role) ||
+        [...loanOfficerRoles, ...approverRoles].includes(role)) &&
+        ['draft', 'submitted', 'under_review', 'appraised', 'recommended'].includes(
+          loan.status,
+        )
     : false;
 }
 
@@ -216,6 +263,140 @@ function nextDueSchedule(schedule: RepaymentScheduleRow[] | undefined) {
     schedule?.[0]?.due_date ??
     undefined
   );
+}
+
+function LoanDetailMetric({
+  label,
+  value,
+  helper,
+  accent = 'slate',
+}: {
+  label: string;
+  value: ReactNode;
+  helper?: ReactNode;
+  accent?: 'brand' | 'slate';
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
+      <p
+        className={`mt-2 break-words text-[clamp(1.35rem,2.8vw,1.85rem)] font-black leading-tight ${
+          accent === 'brand' ? 'text-[#127D61]' : 'text-slate-900'
+        }`}
+      >
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-1 break-words text-sm text-slate-500">{helper}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function LoanInfoField({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: ReactNode;
+  helper?: ReactNode;
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+        {value}
+      </p>
+      {helper ? (
+        <p className="mt-1 break-words text-xs text-slate-500">{helper}</p>
+      ) : null}
+    </div>
+  );
+}
+
+const loanStageKeys = [
+  'submitted',
+  'under_review',
+  'appraised',
+  'recommended',
+  'approved',
+  'disbursed',
+  'closed',
+] as const;
+
+const loanStageAliases: Record<string, string> = {
+  pending: 'submitted',
+  submitted: 'submitted',
+  review: 'under_review',
+  reviewed: 'under_review',
+  under_review: 'under_review',
+  appraised: 'appraised',
+  recommended: 'recommended',
+  approved: 'approved',
+  disbursed: 'disbursed',
+  closed: 'closed',
+  rejected: 'rejected',
+  withdrawn: 'withdrawn',
+  cancelled: 'cancelled',
+  canceled: 'cancelled',
+};
+
+function normalizeLoanStage(value?: string | null) {
+  return (value ?? '').trim().toLowerCase().replaceAll(' ', '_');
+}
+
+function loanStageMeta(status?: string | null) {
+  const normalizedStatus = normalizeLoanStage(status);
+  const resolvedStatus = loanStageAliases[normalizedStatus] ?? normalizedStatus;
+  const stepIndex = loanStageKeys.indexOf(
+    resolvedStatus as (typeof loanStageKeys)[number],
+  );
+
+  if (stepIndex >= 0) {
+    return {
+      label: statusLabel(resolvedStatus),
+      stepText: `Step ${stepIndex + 1} of ${loanStageKeys.length}`,
+      description:
+        resolvedStatus === 'closed'
+          ? 'Loan lifecycle completed'
+          : 'Workflow currently active',
+    };
+  }
+
+  if (resolvedStatus === 'rejected') {
+    return {
+      label: 'Rejected',
+      stepText: 'Workflow stopped',
+      description: 'Application declined before completion',
+    };
+  }
+
+  if (resolvedStatus === 'withdrawn') {
+    return {
+      label: 'Withdrawn',
+      stepText: 'Workflow stopped',
+      description: 'Application withdrawn before completion',
+    };
+  }
+
+  if (resolvedStatus === 'cancelled') {
+    return {
+      label: 'Cancelled',
+      stepText: 'Workflow stopped',
+      description: 'Application cancelled before completion',
+    };
+  }
+
+  return {
+    label: statusLabel(status || 'pending'),
+    stepText: 'Step pending',
+    description: 'Awaiting workflow updates',
+  };
 }
 
 export function LoanApplicationsPage() {
@@ -361,7 +542,9 @@ export function LoanApplicationsPage() {
     : null;
 
   const pendingCount = applications.filter((loan) =>
-    ['submitted', 'under_review', 'recommended'].includes(loan.status),
+    ['submitted', 'under_review', 'appraised', 'recommended'].includes(
+      loan.status,
+    ),
   ).length;
   const disbursableCount = applications.filter(
     (loan) => loan.status === 'approved',
@@ -370,9 +553,18 @@ export function LoanApplicationsPage() {
     (sum, loan) => sum + outstandingValue(loan),
     0,
   );
+  const eligibilitySnapshot = selectedLoan?.eligibility_snapshot ?? null;
+  const eligibilityChecks = eligibilitySnapshot?.checks ?? [];
+  const hasEligibilitySnapshot = Boolean(
+    eligibilitySnapshot &&
+      (typeof eligibilitySnapshot.eligible === 'boolean' ||
+        eligibilityChecks.length > 0),
+  );
   const scheduleRows = selectedLoan?.schedule ?? [];
   const repaymentRows = selectedLoan?.repayments ?? [];
   const actionRows = selectedLoan?.action_history ?? [];
+  const appraisalRows = selectedLoan?.appraisals ?? [];
+  const selectedLoanStage = loanStageMeta(selectedLoan?.status);
 
   function resetApplicationModal() {
     setIsApplicationModalOpen(false);
@@ -457,6 +649,7 @@ export function LoanApplicationsPage() {
         amount: applicationForm.amount.trim(),
         term_months: Number(applicationForm.term_months),
         purpose: applicationForm.purpose.trim(),
+        repayment_source: applicationForm.repayment_source,
         submit: applicationForm.submit_mode === 'submitted',
       };
 
@@ -495,6 +688,25 @@ export function LoanApplicationsPage() {
         await loanApi.applications.startReview(decisionLoan.id, {
           comment: decisionForm.comment.trim(),
         });
+      } else if (decisionMode === 'appraise') {
+        await loanApi.applications.appraise(decisionLoan.id, {
+          recommendation: decisionForm.recommendation,
+          recommended_amount: decisionForm.recommended_amount.trim() || null,
+          recommended_term_months: decisionForm.recommended_term_months.trim()
+            ? Number(decisionForm.recommended_term_months.trim())
+            : null,
+          monthly_income: decisionForm.monthly_income.trim(),
+          monthly_expenses: decisionForm.monthly_expenses.trim() || '0',
+          existing_debt_payments:
+            decisionForm.existing_debt_payments.trim() || '0',
+          risk_score: decisionForm.risk_score.trim()
+            ? Number(decisionForm.risk_score.trim())
+            : null,
+          collateral_notes: decisionForm.collateral_notes.trim(),
+          guarantor_notes: decisionForm.guarantor_notes.trim(),
+          credit_comments: decisionForm.credit_comments.trim(),
+          notes: decisionForm.notes.trim(),
+        });
       } else if (decisionMode === 'recommend') {
         await loanApi.applications.recommend(decisionLoan.id, {
           comment: decisionForm.comment.trim(),
@@ -505,6 +717,11 @@ export function LoanApplicationsPage() {
         });
       } else if (decisionMode === 'reject') {
         await loanApi.applications.reject(decisionLoan.id, {
+          reason: decisionForm.reason.trim(),
+          comment: decisionForm.comment.trim(),
+        });
+      } else if (decisionMode === 'withdraw') {
+        await loanApi.applications.withdraw(decisionLoan.id, {
           reason: decisionForm.reason.trim(),
           comment: decisionForm.comment.trim(),
         });
@@ -565,13 +782,13 @@ export function LoanApplicationsPage() {
     {
       header: isClient ? 'Loan' : 'Client',
       accessor: (loan) => (
-        <div>
-          <p className="font-bold text-slate-900">
+        <div className="min-w-0 max-w-[15rem]">
+          <p className="truncate font-bold text-slate-900">
             {isClient
               ? (loan.product_name ?? 'Loan product')
               : (loan.client_name ?? clientName(loan.client))}
           </p>
-          <p className="text-xs text-slate-500">
+          <p className="mt-1 break-words text-xs text-slate-500">
             {isClient
               ? `${loan.product_code ?? 'Product'} - ${loan.client_member_number ?? 'Member'}`
               : `${loan.client_member_number ?? 'Member'} - ${loan.branch_name ?? 'Branch'}`}
@@ -593,7 +810,17 @@ export function LoanApplicationsPage() {
     },
     {
       header: 'Status',
-      accessor: (loan) => <StatusBadge status={loan.status} />,
+      accessor: (loan) => {
+        const stage = loanStageMeta(loan.status);
+        return (
+          <div className="space-y-1">
+            <StatusBadge status={loan.status} />
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              {stage.stepText}
+            </p>
+          </div>
+        );
+      },
     },
     {
       header: 'Submitted',
@@ -625,6 +852,12 @@ export function LoanApplicationsPage() {
               onClick: () => openDecisionModal('recommend', loan),
             },
             {
+              key: 'appraise',
+              label: 'Appraise',
+              hidden: !canAppraise(actorRole, loan),
+              onClick: () => openDecisionModal('appraise', loan),
+            },
+            {
               key: 'approve',
               label: 'Approve',
               hidden: !canApprove(actorRole, loan),
@@ -636,6 +869,13 @@ export function LoanApplicationsPage() {
               hidden: !canReject(actorRole, loan),
               tone: 'danger',
               onClick: () => openDecisionModal('reject', loan),
+            },
+            {
+              key: 'withdraw',
+              label: 'Withdraw',
+              hidden: !canWithdraw(actorRole, loan),
+              tone: 'danger',
+              onClick: () => openDecisionModal('withdraw', loan),
             },
             {
               key: 'disburse',
@@ -726,7 +966,50 @@ export function LoanApplicationsPage() {
     },
     {
       header: 'Comment',
-      accessor: (row) => row.comment || '-',
+      accessor: (row) => (
+        <p className="max-w-[16rem] break-words text-sm text-slate-700">
+          {row.comment || '-'}
+        </p>
+      ),
+    },
+  ];
+
+  const appraisalColumns: Column<LoanAppraisal>[] = [
+    { header: 'When', accessor: (row) => formatDate(row.created_at) },
+    {
+      header: 'Recommendation',
+      accessor: (row) => (
+        <div>
+          <p className="font-bold text-slate-900">
+            {row.recommendation_label ?? statusLabel(row.recommendation)}
+          </p>
+          <p className="text-xs text-slate-500">
+            Eligibility {row.eligibility_passed ? 'passed' : 'failed'}
+          </p>
+        </div>
+      ),
+    },
+    {
+      header: 'Affordability',
+      accessor: (row) => (
+        <div>
+          <p className="font-semibold text-slate-900">
+            Income {money(row.monthly_income)}
+          </p>
+          <p className="text-xs text-slate-500">
+            Expenses {money(row.monthly_expenses)} | Installment{' '}
+            {money(row.estimated_installment)}
+          </p>
+        </div>
+      ),
+    },
+    {
+      header: 'Notes',
+      accessor: (row) => (
+        <p className="max-w-[16rem] break-words text-sm text-slate-700">
+          {row.notes || row.credit_comments || row.collateral_notes || '-'}
+        </p>
+      ),
     },
   ];
 
@@ -749,6 +1032,7 @@ export function LoanApplicationsPage() {
 
   return (
     <RecordsPageLayout
+      className="min-w-0"
       title={isClient ? 'My loans' : 'Loan applications'}
       description={
         isClient
@@ -782,9 +1066,9 @@ export function LoanApplicationsPage() {
         },
       ]}
       filterPanel={
-        <Card className="grid gap-4">
+        <Card className="grid min-w-0 gap-4 p-4 sm:p-5">
           <CardTitle>Search and filters</CardTitle>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             <Field label="Search">
               <Input
                 value={search}
@@ -813,9 +1097,11 @@ export function LoanApplicationsPage() {
                 <option value="draft">Draft</option>
                 <option value="submitted">Submitted</option>
                 <option value="under_review">Under review</option>
+                <option value="appraised">Appraised</option>
                 <option value="recommended">Recommended</option>
                 <option value="approved">Approved</option>
                 <option value="rejected">Rejected</option>
+                <option value="withdrawn">Withdrawn</option>
                 <option value="disbursed">Disbursed</option>
                 <option value="closed">Closed</option>
               </select>
@@ -842,8 +1128,9 @@ export function LoanApplicationsPage() {
         </Card>
       }
     >
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid min-w-0 gap-5">
         <RecordsListPanel
+          className="min-w-0"
           title={isClient ? 'Loan applications' : 'Loan pipeline'}
           description={
             isClient
@@ -870,7 +1157,7 @@ export function LoanApplicationsPage() {
             ) : undefined
           }
         >
-          <div className="grid gap-4 p-5">
+          <div className="grid min-w-0 gap-4 p-4 sm:p-5">
             {applicationsError && !applicationsData ? (
               <StateView
                 title="Could not load loan applications"
@@ -879,74 +1166,85 @@ export function LoanApplicationsPage() {
                 onAction={reloadApplications}
               />
             ) : (
-              <DataTable<LoanApplication>
-                data={applications}
-                columns={applicationColumns}
-                loading={applicationsLoading}
-                emptyTitle="No loan applications found"
-                emptyMessage="Try widening your filters or create a new application."
-                renderMobileCard={(loan) => (
-                  <article className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-base font-bold text-slate-900">
-                            {loanLabel(loan)}
+              <div className="min-w-0 xl:max-h-[30rem] xl:overflow-auto xl:pr-1">
+                <DataTable<LoanApplication>
+                  data={applications}
+                  columns={applicationColumns}
+                  loading={applicationsLoading}
+                  emptyTitle="No loan applications found"
+                  emptyMessage="Try widening your filters or create a new application."
+                  renderMobileCard={(loan) => (
+                    <article className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 shadow-sm">
+                      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="truncate text-base font-bold text-slate-900">
+                              {loanLabel(loan)}
+                            </p>
+                            <StatusBadge status={loan.status} />
+                          </div>
+                          <p className="mt-1 break-words text-sm text-slate-500">
+                            Submitted{' '}
+                            {formatDate(loan.submitted_at ?? loan.created_at)}
                           </p>
-                          <StatusBadge status={loan.status} />
+                          <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            {loanStageMeta(loan.status).stepText} -{' '}
+                            {loanStageMeta(loan.status).label}
+                          </p>
                         </div>
-                        <p className="mt-1 text-sm text-slate-500">
-                          Submitted{' '}
-                          {formatDate(loan.submitted_at ?? loan.created_at)}
-                        </p>
+                        <Button
+                          type="button"
+                          className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                          onClick={() => setSelectedLoanId(String(loan.id))}
+                        >
+                          View
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
-                        onClick={() => setSelectedLoanId(String(loan.id))}
-                      >
-                        View
-                      </Button>
-                    </div>
 
-                    <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Requested
-                        </p>
-                        <p className="mt-1 font-medium text-slate-800">
-                          {money(loan.amount)}
-                        </p>
+                      <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Requested
+                          </p>
+                          <p className="mt-1 break-words font-medium text-slate-800">
+                            {money(loan.amount)}
+                          </p>
+                        </div>
+                        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Outstanding
+                          </p>
+                          <p className="mt-1 break-words font-medium text-slate-800">
+                            {money(loan.outstanding_balance)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Outstanding
-                        </p>
-                        <p className="mt-1 font-medium text-slate-800">
-                          {money(loan.outstanding_balance)}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                )}
-              />
+                    </article>
+                  )}
+                />
+              </div>
             )}
           </div>
         </RecordsListPanel>
 
-        <div className="grid gap-6">
-          <Card className="grid gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+        <div className="grid min-w-0 gap-5">
+          <Card className="grid min-w-0 gap-4 overflow-hidden p-4 sm:p-5">
+            <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <CardTitle>Loan detail</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 break-words text-sm text-slate-500">
                   {selectedLoan
                     ? `${loanLabel(selectedLoan)} - next due ${formatDate(nextDueSchedule(scheduleRows))}`
                     : 'Select any application to inspect its schedule, approvals, and repayments.'}
                 </p>
               </div>
               {selectedLoan ? (
-                <StatusBadge status={selectedLoan.status} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={selectedLoan.status} />
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-slate-600">
+                    {selectedLoanStage.stepText}
+                  </span>
+                </div>
               ) : null}
             </div>
 
@@ -960,49 +1258,166 @@ export function LoanApplicationsPage() {
                 onAction={reloadActiveLoan}
               />
             ) : selectedLoan ? (
-              <>
-                <LoanStatusStepper
-                  className={activeLoanLoading ? 'opacity-80' : undefined}
-                  loan={selectedLoan}
-                  title={isClient ? 'Loan lifecycle' : 'Approval flow'}
-                />
+              <div className="grid min-w-0 gap-4">
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      Current step
+                    </p>
+                    <p className="mt-1 break-words text-sm font-semibold text-slate-900">
+                      {selectedLoanStage.label}
+                    </p>
+                  </div>
+                  <p className="rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
+                    {selectedLoanStage.stepText}
+                  </p>
+                </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                      Requested amount
-                    </p>
-                    <p className="mt-2 text-2xl font-black text-[#127D61]">
-                      {money(selectedLoan.amount)}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Product{' '}
-                      {selectedLoan.product_name ??
-                        selectedLoan.product_code ??
-                        '-'}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                      Outstanding balance
-                    </p>
-                    <p className="mt-2 text-2xl font-black text-slate-900">
-                      {money(selectedLoan.outstanding_balance)}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Principal {money(selectedLoan.principal_balance)} and
-                      interest {money(selectedLoan.interest_balance)}
-                    </p>
-                  </div>
+                <div className="min-w-0 overflow-x-auto pb-1">
+                  <LoanStatusStepper
+                    className={activeLoanLoading ? 'opacity-80' : undefined}
+                    loan={selectedLoan}
+                    title={isClient ? 'Loan lifecycle' : 'Approval flow'}
+                  />
+                </div>
+
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+                  <LoanDetailMetric
+                    label="Requested amount"
+                    value={money(selectedLoan.amount)}
+                    helper={
+                      selectedLoan.product_name ??
+                      selectedLoan.product_code ??
+                      'Loan product'
+                    }
+                    accent="brand"
+                  />
+                  <LoanDetailMetric
+                    label="Outstanding balance"
+                    value={money(selectedLoan.outstanding_balance)}
+                    helper={`Principal ${money(selectedLoan.principal_balance)} | Interest ${money(selectedLoan.interest_balance)}`}
+                  />
+                  <LoanDetailMetric
+                    label="Requested term"
+                    value={`${selectedLoan.term_months ?? '-'} months`}
+                    helper={`Interest ${selectedLoan.annual_interest_rate ?? 0}%`}
+                  />
+                  <LoanDetailMetric
+                    label="Next due"
+                    value={formatDate(nextDueSchedule(scheduleRows))}
+                    helper={`Repayment source ${statusLabel(selectedLoan.repayment_source || 'other')}`}
+                  />
                 </div>
 
                 {selectedLoan.status === 'rejected' ? (
                   <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
                     <p className="font-bold">Rejection note</p>
-                    <p className="mt-1">
+                    <p className="mt-1 break-words">
                       {selectedLoan.rejected_reason ||
                         'No rejection reason was provided.'}
                     </p>
+                  </div>
+                ) : null}
+
+                {selectedLoan.status === 'withdrawn' ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <p className="font-bold text-slate-900">Withdrawal note</p>
+                    <p className="mt-1 break-words">
+                      {selectedLoan.withdrawal_reason ||
+                        'No withdrawal reason was provided.'}
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    Purpose
+                  </p>
+                  <p className="mt-2 break-words text-sm leading-6 text-slate-700">
+                    {selectedLoan.purpose ||
+                      'No purpose was provided for this application.'}
+                  </p>
+                </div>
+
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+                  <LoanInfoField
+                    label="Client"
+                    value={selectedLoan.client_name ?? clientName(selectedLoan.client)}
+                    helper={selectedLoan.client_member_number ?? 'No member number'}
+                  />
+                  <LoanInfoField
+                    label="Branch"
+                    value={selectedLoan.branch_name || 'No branch'}
+                    helper={selectedLoan.product_code || 'No product code'}
+                  />
+                  <LoanInfoField
+                    label="Repayment source"
+                    value={statusLabel(selectedLoan.repayment_source || 'other')}
+                    helper={
+                      selectedLoan.repayment_frequency
+                        ? statusLabel(selectedLoan.repayment_frequency)
+                        : 'No repayment frequency'
+                    }
+                  />
+                  <LoanInfoField
+                    label="Submitted"
+                    value={formatDate(selectedLoan.submitted_at ?? selectedLoan.created_at)}
+                    helper={`Current status ${statusLabel(selectedLoan.status)}`}
+                  />
+                </div>
+
+                {hasEligibilitySnapshot ? (
+                  <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-slate-900">
+                          Eligibility snapshot
+                        </p>
+                        <p className="mt-1 break-words text-sm text-slate-500">
+                          Latest backend eligibility result for this request.
+                        </p>
+                      </div>
+                      <StatusBadge
+                        status={
+                          eligibilitySnapshot?.eligible
+                            ? 'active'
+                            : 'rejected'
+                        }
+                      />
+                    </div>
+
+                    <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
+                      {eligibilityChecks.map((check) => (
+                        <div
+                          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                          key={check.code}
+                        >
+                          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+                            <p className="min-w-0 flex-1 break-words font-semibold text-slate-900">
+                              {check.label ?? statusLabel(check.code)}
+                            </p>
+                            <StatusBadge
+                              status={check.passed ? 'active' : 'rejected'}
+                            />
+                          </div>
+                          <p className="mt-2 break-words text-sm text-slate-600">
+                            {check.message}
+                          </p>
+                          {(check.value != null || check.threshold != null) ? (
+                            <p className="mt-2 break-words text-xs text-slate-500">
+                              Value {check.value ?? '-'} | Threshold{' '}
+                              {check.threshold ?? '-'}
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                      {!eligibilityChecks.length ? (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-600 md:col-span-2">
+                          No detailed eligibility checks were stored for this
+                          application yet.
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
 
@@ -1028,6 +1443,15 @@ export function LoanApplicationsPage() {
                       Recommend
                     </Button>
                   ) : null}
+                  {canAppraise(actorRole, selectedLoan) ? (
+                    <Button
+                      type="button"
+                      className="bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                      onClick={() => openDecisionModal('appraise', selectedLoan)}
+                    >
+                      Appraise
+                    </Button>
+                  ) : null}
                   {canApprove(actorRole, selectedLoan) ? (
                     <Button
                       type="button"
@@ -1043,6 +1467,15 @@ export function LoanApplicationsPage() {
                       onClick={() => openDecisionModal('reject', selectedLoan)}
                     >
                       Reject
+                    </Button>
+                  ) : null}
+                  {canWithdraw(actorRole, selectedLoan) ? (
+                    <Button
+                      type="button"
+                      className="bg-white text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50"
+                      onClick={() => openDecisionModal('withdraw', selectedLoan)}
+                    >
+                      Withdraw
                     </Button>
                   ) : null}
                   {canDisburse(actorRole, selectedLoan) ? (
@@ -1066,10 +1499,10 @@ export function LoanApplicationsPage() {
                   ) : null}
                 </div>
 
-                <div className="grid gap-4">
-                  <div>
+                <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+                  <div className="min-w-0">
                     <CardTitle>Repayment schedule</CardTitle>
-                    <div className="mt-3">
+                    <div className="mt-3 min-w-0 overflow-hidden">
                       <DataTable<RepaymentScheduleRow>
                         data={scheduleRows}
                         columns={scheduleColumns}
@@ -1079,9 +1512,9 @@ export function LoanApplicationsPage() {
                     </div>
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <CardTitle>Repayments</CardTitle>
-                    <div className="mt-3">
+                    <div className="mt-3 min-w-0 overflow-hidden">
                       <DataTable<LoanRepayment>
                         data={repaymentRows}
                         columns={repaymentColumns}
@@ -1091,9 +1524,21 @@ export function LoanApplicationsPage() {
                     </div>
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
+                    <CardTitle>Appraisals</CardTitle>
+                    <div className="mt-3 min-w-0 overflow-hidden">
+                      <DataTable<LoanAppraisal>
+                        data={appraisalRows}
+                        columns={appraisalColumns}
+                        emptyTitle="No appraisals recorded"
+                        emptyMessage="Appraisals will appear here once a loan officer completes them."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0">
                     <CardTitle>Action history</CardTitle>
-                    <div className="mt-3">
+                    <div className="mt-3 min-w-0 overflow-hidden">
                       <DataTable<LoanApplicationAction>
                         data={actionRows}
                         columns={actionColumns}
@@ -1103,7 +1548,7 @@ export function LoanApplicationsPage() {
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             ) : (
               <StateView
                 title="No loan selected"
@@ -1256,7 +1701,7 @@ export function LoanApplicationsPage() {
               </Field>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <Field label="Term (months)">
                 <Input
                   type="number"
@@ -1271,6 +1716,26 @@ export function LoanApplicationsPage() {
                   }
                   required
                 />
+              </Field>
+
+              <Field label="Repayment source">
+                <select
+                  className={formSelectClassName}
+                  value={applicationForm.repayment_source}
+                  onChange={(event) =>
+                    setApplicationForm((current) => ({
+                      ...current,
+                      repayment_source: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="business">Business</option>
+                  <option value="salary">Salary</option>
+                  <option value="farm">Farm</option>
+                  <option value="savings">Savings</option>
+                  <option value="payroll">Payroll</option>
+                  <option value="other">Other</option>
+                </select>
               </Field>
 
               {!isClient ? (
@@ -1318,7 +1783,12 @@ export function LoanApplicationsPage() {
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   Interest {selectedProduct.annual_interest_rate}% -{' '}
-                  {statusLabel(selectedProduct.repayment_frequency)}
+                  {statusLabel(selectedProduct.repayment_frequency)} | Grace{' '}
+                  {selectedProduct.grace_period_days ?? 0} days
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Minimum savings {money(selectedProduct.minimum_savings_balance)} |
+                  minimum shares {money(selectedProduct.minimum_share_capital)}
                 </p>
               </div>
             ) : null}
@@ -1379,7 +1849,7 @@ export function LoanApplicationsPage() {
               </div>
             ) : null}
 
-            {decisionMode === 'reject' ? (
+            {decisionMode === 'reject' || decisionMode === 'withdraw' ? (
               <Field label="Reason">
                 <textarea
                   className={applicationTextareaClassName}
@@ -1393,6 +1863,180 @@ export function LoanApplicationsPage() {
                   required
                 />
               </Field>
+            ) : null}
+
+            {decisionMode === 'appraise' ? (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Recommendation">
+                    <select
+                      className={formSelectClassName}
+                      value={decisionForm.recommendation}
+                      onChange={(event) =>
+                        setDecisionForm((current) => ({
+                          ...current,
+                          recommendation: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="approve">Recommend approval</option>
+                      <option value="reject">Recommend rejection</option>
+                      <option value="modify">Recommend modification</option>
+                    </select>
+                  </Field>
+                  <Field label="Risk score">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={decisionForm.risk_score}
+                      onChange={(event) =>
+                        setDecisionForm((current) => ({
+                          ...current,
+                          risk_score: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional"
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Monthly income">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={decisionForm.monthly_income}
+                      onChange={(event) =>
+                        setDecisionForm((current) => ({
+                          ...current,
+                          monthly_income: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </Field>
+                  <Field label="Monthly expenses">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={decisionForm.monthly_expenses}
+                      onChange={(event) =>
+                        setDecisionForm((current) => ({
+                          ...current,
+                          monthly_expenses: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Field label="Existing debt payments">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={decisionForm.existing_debt_payments}
+                      onChange={(event) =>
+                        setDecisionForm((current) => ({
+                          ...current,
+                          existing_debt_payments: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
+                  <Field label="Recommended amount">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={decisionForm.recommended_amount}
+                      onChange={(event) =>
+                        setDecisionForm((current) => ({
+                          ...current,
+                          recommended_amount: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional"
+                    />
+                  </Field>
+                  <Field label="Recommended term (months)">
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={decisionForm.recommended_term_months}
+                      onChange={(event) =>
+                        setDecisionForm((current) => ({
+                          ...current,
+                          recommended_term_months: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Collateral notes">
+                  <textarea
+                    className={applicationTextareaClassName}
+                    value={decisionForm.collateral_notes}
+                    onChange={(event) =>
+                      setDecisionForm((current) => ({
+                        ...current,
+                        collateral_notes: event.target.value,
+                      }))
+                    }
+                    placeholder="Collateral observations, valuation notes, or gaps."
+                  />
+                </Field>
+
+                <Field label="Guarantor notes">
+                  <textarea
+                    className={applicationTextareaClassName}
+                    value={decisionForm.guarantor_notes}
+                    onChange={(event) =>
+                      setDecisionForm((current) => ({
+                        ...current,
+                        guarantor_notes: event.target.value,
+                      }))
+                    }
+                    placeholder="Guarantor assessment and support capacity."
+                  />
+                </Field>
+
+                <Field label="Credit comments">
+                  <textarea
+                    className={applicationTextareaClassName}
+                    value={decisionForm.credit_comments}
+                    onChange={(event) =>
+                      setDecisionForm((current) => ({
+                        ...current,
+                        credit_comments: event.target.value,
+                      }))
+                    }
+                    placeholder="Credit observations, repayment behavior, and officer comments."
+                  />
+                </Field>
+
+                <Field label="Appraisal note">
+                  <textarea
+                    className={applicationTextareaClassName}
+                    value={decisionForm.notes}
+                    onChange={(event) =>
+                      setDecisionForm((current) => ({
+                        ...current,
+                        notes: event.target.value,
+                      }))
+                    }
+                    placeholder="Summarize the affordability and final recommendation."
+                  />
+                </Field>
+              </>
             ) : null}
 
             {decisionMode === 'disburse' ? (
@@ -1430,7 +2074,7 @@ export function LoanApplicationsPage() {
               </>
             ) : null}
 
-            {decisionMode !== 'disburse' ? (
+            {decisionMode !== 'disburse' && decisionMode !== 'appraise' ? (
               <Field label="Comment">
                 <textarea
                   className={applicationTextareaClassName}

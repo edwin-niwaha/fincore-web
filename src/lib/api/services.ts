@@ -11,6 +11,10 @@ import type {
   JournalEntry,
   LedgerAccount,
   LoanApplication,
+  LoanArrearsAgingReport,
+  LoanCollectionsReport,
+  LoanDisbursementReport,
+  LoanEligibilitySnapshot,
   LoanProduct,
   LoanPortfolioReport,
   LoanRepayment,
@@ -92,6 +96,7 @@ type SavingsAccountWritePayload = {
 type SavingsOperationPayload = {
   amount: string | number;
   reference: string;
+  transaction_date?: string;
   notes?: string;
 };
 type ShareProductWritePayload = {
@@ -144,6 +149,7 @@ type LoanProductWritePayload = {
   institution: string | number;
   name: string;
   code: string;
+  description?: string;
   min_amount: string | number;
   max_amount: string | number;
   annual_interest_rate: string | number;
@@ -152,9 +158,19 @@ type LoanProductWritePayload = {
   min_term_months: number;
   max_term_months: number;
   default_term_months?: number | null;
+  grace_period_days?: number;
   penalty_rate?: string | number;
   penalty_flat_amount?: string | number;
   penalty_grace_days?: number;
+  minimum_savings_balance?: string | number;
+  minimum_share_capital?: string | number;
+  max_outstanding_loans?: number | null;
+  max_amount_to_savings_ratio?: string | number | null;
+  max_amount_to_share_ratio?: string | number | null;
+  debt_to_income_limit?: string | number | null;
+  receivable_account?: string | number | null;
+  funding_account?: string | number | null;
+  interest_income_account?: string | number | null;
   is_active?: boolean;
 };
 type LoanApplicationWritePayload = {
@@ -163,7 +179,17 @@ type LoanApplicationWritePayload = {
   amount: string | number;
   term_months: number;
   purpose?: string;
+  repayment_source?: string;
   submit?: boolean;
+};
+type LoanEligibilityCheckPayload = {
+  client?: string | number;
+  product: string | number;
+  amount: string | number;
+  term_months: number;
+  monthly_income?: string | number;
+  monthly_expenses?: string | number;
+  existing_debt_payments?: string | number;
 };
 type LoanDecisionPayload = {
   reason?: string;
@@ -171,6 +197,19 @@ type LoanDecisionPayload = {
   reference?: string;
   disbursement_method?: string;
   override?: boolean;
+};
+type LoanAppraisalWritePayload = {
+  recommendation: string;
+  recommended_amount?: string | number | null;
+  recommended_term_months?: number | null;
+  monthly_income: string | number;
+  monthly_expenses?: string | number;
+  existing_debt_payments?: string | number;
+  risk_score?: number | null;
+  collateral_notes?: string;
+  guarantor_notes?: string;
+  credit_comments?: string;
+  notes?: string;
 };
 type LoanRepaymentWritePayload = {
   amount: string | number;
@@ -350,6 +389,11 @@ export const loanApi = {
       endpoints.loanApplications,
       endpoints.loanApplicationDetail,
     ),
+    eligibilityCheck: (payload: LoanEligibilityCheckPayload) =>
+      apiClient.post<LoanEligibilitySnapshot>(
+        endpoints.loanApplicationEligibilityCheck,
+        payload,
+      ),
     submit: (id: string | number, payload?: LoanDecisionPayload) =>
       apiClient.post<LoanApplication>(endpoints.loanApplicationSubmit(id), payload ?? {}),
     startReview: (id: string | number, payload?: LoanDecisionPayload) =>
@@ -357,6 +401,8 @@ export const loanApi = {
         endpoints.loanApplicationStartReview(id),
         payload ?? {},
       ),
+    appraise: (id: string | number, payload: LoanAppraisalWritePayload) =>
+      apiClient.post<LoanApplication>(endpoints.loanApplicationAppraise(id), payload),
     recommend: (id: string | number, payload?: LoanDecisionPayload) =>
       apiClient.post<LoanApplication>(
         endpoints.loanApplicationRecommend(id),
@@ -366,6 +412,11 @@ export const loanApi = {
       apiClient.post<LoanApplication>(endpoints.loanApplicationApprove(id), payload ?? {}),
     reject: (id: string | number, payload?: LoanDecisionPayload) =>
       apiClient.post<LoanApplication>(endpoints.loanApplicationReject(id), payload ?? {}),
+    withdraw: (id: string | number, payload?: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(
+        endpoints.loanApplicationWithdraw(id),
+        payload ?? {},
+      ),
     disburse: (id: string | number, payload: LoanDecisionPayload) =>
       apiClient.post<LoanApplication>(endpoints.loanApplicationDisburse(id), payload),
     repay: (id: string | number, payload: LoanRepaymentWritePayload) =>
@@ -397,6 +448,10 @@ export const savingsApi = {
       apiClient.post<SavingsTransaction>(endpoints.savingsAccountWithdraw(id), payload),
     transactions: (id: string | number, query?: Query) =>
       apiClient.get<ListResponse<SavingsTransaction>>(
+        withQuery(endpoints.savingsAccountTransactions(id), query),
+      ),
+    transactionsAll: (id: string | number, query?: Query) =>
+      listAllPages<SavingsTransaction>(
         withQuery(endpoints.savingsAccountTransactions(id), query),
       ),
   },
@@ -532,6 +587,16 @@ export const selfServiceApi = {
       apiClient.post<LoanApplication>(endpoints.selfService.loanApplications, payload),
     get: (id: string | number) =>
       apiClient.get<LoanApplication>(endpoints.selfService.loanApplicationDetail(id)),
+    eligibilityCheck: (payload: LoanEligibilityCheckPayload) =>
+      apiClient.post<LoanEligibilitySnapshot>(
+        endpoints.loanApplicationEligibilityCheck,
+        payload,
+      ),
+    withdraw: (id: string | number, payload?: LoanDecisionPayload) =>
+      apiClient.post<LoanApplication>(
+        endpoints.loanApplicationWithdraw(id),
+        payload ?? {},
+      ),
   },
   loans: {
     statement: (query?: Query) =>
@@ -600,6 +665,18 @@ export const accountingApi = {
     loanPortfolio: (query?: Query) =>
       apiClient.get<LoanPortfolioReport>(
         withQuery(endpoints.reports.loanPortfolio, query),
+      ),
+    loanDisbursements: (query?: Query) =>
+      apiClient.get<LoanDisbursementReport>(
+        withQuery(endpoints.reports.loanDisbursements, query),
+      ),
+    loanCollections: (query?: Query) =>
+      apiClient.get<LoanCollectionsReport>(
+        withQuery(endpoints.reports.loanCollections, query),
+      ),
+    loanArrearsAging: (query?: Query) =>
+      apiClient.get<LoanArrearsAgingReport>(
+        withQuery(endpoints.reports.loanArrearsAging, query),
       ),
     trialBalance: (query?: Query) =>
       apiClient.get<TrialBalanceReport>(

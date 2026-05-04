@@ -206,6 +206,7 @@ export type LoanProduct = {
   institution_name?: string | null;
   name: string;
   code: string;
+  description?: string;
   min_amount?: string | number;
   max_amount?: string | number;
   annual_interest_rate?: string | number;
@@ -214,9 +215,22 @@ export type LoanProduct = {
   min_term_months?: number;
   max_term_months?: number;
   default_term_months?: number | null;
+  grace_period_days?: number;
   penalty_rate?: string | number;
   penalty_flat_amount?: string | number;
   penalty_grace_days?: number;
+  minimum_savings_balance?: string | number;
+  minimum_share_capital?: string | number;
+  max_outstanding_loans?: number | null;
+  max_amount_to_savings_ratio?: string | number | null;
+  max_amount_to_share_ratio?: string | number | null;
+  debt_to_income_limit?: string | number | null;
+  receivable_account?: UUID | null;
+  receivable_account_name?: string | null;
+  funding_account?: UUID | null;
+  funding_account_name?: string | null;
+  interest_income_account?: UUID | null;
+  interest_income_account_name?: string | null;
   is_active?: boolean;
   application_count?: number;
   total_requested_amount?: string | number;
@@ -305,10 +319,165 @@ export type SavingsBalancesReport = {
   accounts?: number;
 };
 
+export type LoanPortfolioStatusBreakdown = {
+  status: string;
+  count: number;
+  requested_amount?: string | number;
+  outstanding_balance?: string | number;
+};
+
+export type LoanPortfolioProductBreakdown = {
+  product_id?: UUID | null;
+  product_name?: string;
+  product_code?: string;
+  loan_count?: number;
+  requested_amount?: string | number;
+  outstanding_balance?: string | number;
+};
+
+export type LoanPortfolioReportRow = LoanApplication & {
+  oldest_due_date?: string | null;
+  days_past_due?: number;
+  overdue_installments?: number;
+  overdue_amount?: string | number;
+};
+
 export type LoanPortfolioReport = {
+  generated_at?: string;
+  as_of?: string;
+  institution?: string | null;
+  branch?: string | null;
+  product?: string | null;
+  status?: string | null;
   principal_outstanding?: string | number;
+  interest_outstanding?: string | number;
+  portfolio_balance?: string | number;
+  arrears_balance?: string | number;
   loans?: number;
   pending?: number;
+  appraised?: number;
+  recommended?: number;
+  approved?: number;
+  active?: number;
+  overdue_loans?: number;
+  closed?: number;
+  rejected?: number;
+  withdrawn?: number;
+  written_off?: number;
+  status_breakdown?: LoanPortfolioStatusBreakdown[];
+  product_breakdown?: LoanPortfolioProductBreakdown[];
+  rows?: LoanPortfolioReportRow[];
+};
+
+export type LoanDisbursementReportRow = {
+  loan_id: UUID;
+  client_name?: string;
+  client_member_number?: string;
+  branch_name?: string;
+  product_name?: string;
+  product_code?: string;
+  status?: string;
+  approved_at?: string | null;
+  disbursed_at?: string | null;
+  amount?: string | number;
+  principal_balance?: string | number;
+  interest_balance?: string | number;
+  outstanding_balance?: string | number;
+  disbursement_reference?: string;
+  disbursement_method?: string;
+};
+
+export type LoanDisbursementReport = {
+  generated_at?: string;
+  date_from?: string | null;
+  date_to?: string | null;
+  institution?: string | null;
+  branch?: string | null;
+  product?: string | null;
+  totals?: {
+    count?: number;
+    amount?: string | number;
+    principal_outstanding?: string | number;
+    interest_outstanding?: string | number;
+    portfolio_balance?: string | number;
+  };
+  rows: LoanDisbursementReportRow[];
+};
+
+export type LoanCollectionsReportRow = {
+  repayment_id: UUID;
+  loan_id: UUID;
+  client_name?: string;
+  client_member_number?: string;
+  branch_name?: string;
+  product_name?: string;
+  product_code?: string;
+  recorded_at?: string | null;
+  reference?: string;
+  payment_method?: string;
+  amount?: string | number;
+  principal_component?: string | number;
+  interest_component?: string | number;
+  penalty_component?: string | number;
+  remaining_balance_after?: string | number;
+  received_by_email?: string;
+};
+
+export type LoanCollectionsReport = {
+  generated_at?: string;
+  date_from?: string | null;
+  date_to?: string | null;
+  institution?: string | null;
+  branch?: string | null;
+  product?: string | null;
+  totals?: {
+    count?: number;
+    amount?: string | number;
+    principal_component?: string | number;
+    interest_component?: string | number;
+    penalty_component?: string | number;
+  };
+  rows: LoanCollectionsReportRow[];
+};
+
+export type LoanArrearsAgingReportRow = {
+  loan_id: UUID;
+  client_name?: string;
+  client_member_number?: string;
+  branch_name?: string;
+  product_name?: string;
+  product_code?: string;
+  status?: string;
+  disbursed_at?: string | null;
+  next_due_date?: string | null;
+  oldest_due_date?: string | null;
+  days_past_due?: number;
+  overdue_installments?: number;
+  overdue_amount?: string | number;
+  outstanding_balance?: string | number;
+  bucket_1_30?: string | number;
+  bucket_31_60?: string | number;
+  bucket_61_90?: string | number;
+  bucket_91_plus?: string | number;
+};
+
+export type LoanArrearsAgingReport = {
+  generated_at?: string;
+  as_of?: string;
+  institution?: string | null;
+  branch?: string | null;
+  product?: string | null;
+  totals?: {
+    loans_in_arrears?: number;
+    overdue_balance?: string | number;
+    portfolio_balance?: string | number;
+    par_ratio?: string | number;
+    bucket_1_30?: string | number;
+    bucket_31_60?: string | number;
+    bucket_61_90?: string | number;
+    bucket_91_plus?: string | number;
+  };
+  rows: LoanArrearsAgingReportRow[];
 };
 
 export type SavingsAccount = {
@@ -344,6 +513,7 @@ export type SavingsTransaction = {
   type?: string;
   type_label?: string;
   status?: string;
+  transaction_date?: string;
   amount: string | number;
   balance_after?: string | number;
   reference?: string;
@@ -424,6 +594,7 @@ export type LoanApplication = {
   requested_amount?: string | number;
   term_months?: number;
   purpose?: string;
+  repayment_source?: string;
   created_by?: UUID | null;
   created_by_email?: string | null;
   submitted_by?: UUID | null;
@@ -435,6 +606,9 @@ export type LoanApplication = {
   status: string;
   submitted_at?: string;
   reviewed_at?: string | null;
+  appraised_by?: UUID | null;
+  appraised_by_email?: string | null;
+  appraised_at?: string | null;
   recommended_by?: UUID | null;
   recommended_by_email?: string | null;
   recommended_at?: string | null;
@@ -445,16 +619,22 @@ export type LoanApplication = {
   rejected_by_email?: string | null;
   rejected_at?: string | null;
   rejected_reason?: string;
+  withdrawn_by?: UUID | null;
+  withdrawn_by_email?: string | null;
+  withdrawn_at?: string | null;
+  withdrawal_reason?: string;
   disbursed_at?: string | null;
   disbursed_by?: UUID | null;
   disbursed_by_email?: string | null;
   disbursement_method?: string;
   disbursement_reference?: string;
+  eligibility_snapshot?: LoanEligibilitySnapshot | null;
   repayment_count?: number;
   schedule_count?: number;
   schedule?: RepaymentScheduleRow[];
   repayments?: LoanRepayment[];
   action_history?: LoanApplicationAction[];
+  appraisals?: LoanAppraisal[];
   created_at?: string;
   updated_at?: string;
 };
@@ -508,6 +688,60 @@ export type LoanApplicationAction = {
   acted_by_email?: string | null;
   comment?: string;
   reference?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type LoanEligibilityCheck = {
+  code: string;
+  label?: string;
+  passed: boolean;
+  message?: string;
+  value?: string | number | null;
+  threshold?: string | number | null;
+};
+
+export type LoanEligibilitySnapshot = {
+  eligible: boolean;
+  checks: LoanEligibilityCheck[];
+  summary?: {
+    requested_amount?: string | number;
+    estimated_installment?: string | number;
+    savings_balance?: string | number;
+    share_capital?: string | number;
+    outstanding_loans_count?: number;
+    overdue_loans_count?: number;
+    monthly_income?: string | number | null;
+    monthly_expenses?: string | number;
+    existing_debt_payments?: string | number;
+  };
+  errors?: string[];
+};
+
+export type LoanAppraisal = {
+  id: UUID;
+  application?: UUID | null;
+  performed_by?: UUID | null;
+  performed_by_email?: string | null;
+  recommendation?: string;
+  recommendation_label?: string | null;
+  recommended_amount?: string | number | null;
+  recommended_term_months?: number | null;
+  monthly_income?: string | number;
+  monthly_expenses?: string | number;
+  existing_debt_payments?: string | number;
+  affordability_amount?: string | number;
+  estimated_installment?: string | number;
+  risk_score?: number | null;
+  savings_balance_snapshot?: string | number;
+  share_capital_snapshot?: string | number;
+  outstanding_loans_snapshot?: number;
+  overdue_loans_snapshot?: number;
+  eligibility_passed?: boolean;
+  collateral_notes?: string;
+  guarantor_notes?: string;
+  credit_comments?: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
 };
@@ -654,7 +888,7 @@ export type ApiProblem = {
 export type ShareProduct = {
   id: UUID;
   institution: UUID;
-  institution_name?: string;
+  institution_name?: string | null;
   name: string;
   code: string;
   nominal_price: string | number;
@@ -672,15 +906,21 @@ export type ShareAccount = {
   client: UUID;
   client_name?: string;
   client_member_number?: string;
+  branch_id?: UUID | null;
+  branch_name?: string | null;
+  institution_id?: UUID | null;
+  institution_name?: string | null;
   product: UUID;
   product_name?: string;
+  product_code?: string;
   nominal_price?: string | number;
-  branch_name?: string;
-  institution_name?: string;
   account_number?: string;
   shares?: number;
   total_value?: string | number;
   status?: string;
+  transaction_count?: number;
+  last_transaction_at?: string | null;
+  recent_transactions?: ShareTransaction[];
   created_at?: string;
   updated_at?: string;
 };
@@ -689,16 +929,25 @@ export type ShareTransaction = {
   id: UUID;
   account: UUID;
   account_number?: string;
+  client_id?: UUID | null;
   client_name?: string;
+  client_member_number?: string;
+  branch_name?: string | null;
+  institution_name?: string | null;
+  product?: UUID | null;
   product_name?: string;
+  product_code?: string;
   type: string;
   type_label?: string;
+  status?: string;
   shares: number;
   amount: string | number;
   balance_after?: number;
   reference: string;
   performed_by?: UUID | null;
   performed_by_email?: string | null;
+  recorded_by?: UUID | null;
+  recorded_by_email?: string | null;
   notes?: string;
   created_at?: string;
   updated_at?: string;

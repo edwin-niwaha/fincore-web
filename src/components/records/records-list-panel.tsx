@@ -18,9 +18,9 @@ export function RecordsListPanel({
   className?: string;
 }) {
   return (
-    <Card className={cn('overflow-hidden p-0', className)}>
+    <Card className={cn('min-w-0 overflow-hidden p-0', className)}>
       <div className="card-header flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-4">
-        <div className="max-w-2xl">
+        <div className="min-w-0 max-w-2xl">
           <CardTitle>{title}</CardTitle>
           {description ? (
             <p className="mt-1 text-sm text-slate-500">{description}</p>
